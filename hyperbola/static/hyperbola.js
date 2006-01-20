@@ -6,5 +6,5 @@ if (typeof Hyperbola == 'undefined') {
     Hyperbola = {};
 }
 
-Hyperbola.AddBlog = Mantissa.LiveForm.FormWidget.subclass();
+Hyperbola.AddBlog = Mantissa.LiveForm.FormWidget.subclass('Hyperbola.AddBlog');
 
