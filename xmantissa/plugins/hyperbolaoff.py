@@ -5,6 +5,7 @@ from xmantissa import website, offering, provisioning
 import hyperbola
 
 from hyperbola import hyperbola_model
+from hyperbola.hyperbola_theme import HyperbolaTheme
 
 hyperbolaer = provisioning.BenefactorFactory(
     name = u'hyperbolaer',
@@ -25,6 +26,8 @@ plugin = offering.Offering(
     appPowerups = (
         ),
 
-    benefactorFactories = (hyperbolaer,)
+    benefactorFactories = (hyperbolaer,),
+
+    themes = (HyperbolaTheme('base', 0),)
     )
 
