@@ -6,5 +6,5 @@ is a graceful curving shape, and the very similar-looking "Hyperbole"
 is a very big exaggeration, something that people are prone to do on blogs and
 forums.
 
-Divmod Hyperbola both a blog, and a forum.  It is designed to allow you to
+Divmod Hyperbola is both a blog, and a forum.  It is designed to allow you to
 gracefully express your shameless self-aggrandizement on the internet.
