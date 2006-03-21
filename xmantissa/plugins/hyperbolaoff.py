@@ -27,7 +27,7 @@ plugin = offering.Offering(
         ),
 
     benefactorFactories = (hyperbolaer,),
-
+    loginInterfaces = (),
     themes = (HyperbolaTheme('base', 0),)
     )
 
