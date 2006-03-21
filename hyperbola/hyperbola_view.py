@@ -8,6 +8,7 @@ from xmantissa import ixmantissa, webtheme
 from xmantissa import tdbview, sharing, liveform
 
 from hyperbola.hyperblurb import Blurb, FLAVOR
+from hyperbola import ihyperbola
 
 class HyperbolaView(athena.LiveFragment):
     # This is a Fragment of a Page
@@ -70,7 +71,8 @@ class BlogAddingFragment(liveform.LiveForm):
         sharing.getSelfRole(store).becomeMemberOf(authorsRole)
 
         sharing.shareItem(blog, authorsRole, shareID=u'blog')
-        sharing.shareItem(blog, sharing.getEveryoneRole(store), shareID=u'blog', attributeNames=(u'title', u'body', u'dateLastEdited', u'author'))
+        sharing.shareItem(blog, sharing.getEveryoneRole(store), shareID=u'blog',
+                          interfaces=[ihyperbola.IViewer])
 
 
 class BlurbViewer(athena.LiveFragment):

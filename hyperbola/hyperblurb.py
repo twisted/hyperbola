@@ -1,10 +1,15 @@
+# -*- test-case-name: hyperbola.test.test_hyperbola -*-
+
+from twisted.python.reflect import qual, namedAny
 
 from epsilon.extime import Time
 
 from axiom.item import Item
-from axiom.attributes import text, reference, integer, timestamp
+from axiom.attributes import text, reference, integer, timestamp, AND
 
-from xmantissa.sharing import Role, allow
+from xmantissa.sharing import Role, shareItem
+
+from hyperbola import ihyperbola
 
 class FLAVOR:
     BLOG = u'FLAVOR.BLOG'
@@ -63,6 +68,22 @@ class MetaBlurb(Item):
     value = text()
 
 
+class FlavorPermission(Item):
+    """ I am associated with a top-level Blurb and specify the associated roles for
+    all of its children.  For example: if there is a top-level blurb
+    representing a blog, there might be a FlavorPermission associated with it
+    that makes reference to a 'commenter' role for the BLOG_POST flavor, which
+    has permissions
+    'post,title,body,dateCreated,dateLastEdited,author,flavor,parent' - but
+    conspicuously omits 'edit' and 'hits'.
+    """
+
+    typeName = 'hyperbola_flavor_permission'
+    flavor = text()
+    blurb = reference()
+    role = reference()
+    permissions = text()        # comma-separated list of attributes
+
 class Blurb(Item):
     """
     I am some text written by a user.
@@ -93,9 +114,12 @@ class Blurb(Item):
                        allowNone=False)
 
     parent = reference()        # to Blurb, but you can't spell that AGGUGHH
-    flavor = text(doc="One of FLAVOR's capitalized attributes.")
+    flavor = text(doc="One of FLAVOR's capitalized attributes.", allowNone=False)
 
     def edit(self, newTitle, newBody, newAuthor):
+        """ Edit an existing blurb, saving a PastBlurb of its current state for
+        rollback purposes.
+        """
         # Edit is only called on subsequent edits, not the first time, so we
         # need to save our current contents as history.
         editDate = Time()
@@ -111,11 +135,69 @@ class Blurb(Item):
         self.dateLastEdited = editDate
         self.author = newAuthor
 
+    def post(self, childTitle, childBody, childAuthor):
+        """
+        Create a new child of this Blurb, with a flavor derived from the
+        mapping into FLAVOR.commentFlavors of self.flavor, shared to every role
+        specified by FlavorPermission items that refer to the new flavor of
+        blurb that will be created, and this blurb or any of my parents.
 
-    allow(edit,
-          'title', 'body', 'dateCreated', 'dateLastEdited', 'author',
-          'flavor', 'hits',
-          'parent')
+        For example, if I am a FLAVOR.BLOG, the child will be a
+        FLAVOR.BLOG_POST.  If the FlavorPermissions are set up correctly for
+        me, one role will be able to view that post, another to comment on it.
+
+        By using FlavorPermissions appropriately, you can have a blog that
+        allows public posting, and a blog that allows private posting and no
+        public viewing, and a blog that allows public viewing but only
+        permissioned posting and commenting, all in the same store.
+
+        @return: A share ID.
+        """
+
+        newFlavor = FLAVOR.commentFlavors[self.flavor]
+        newBlurb = Blurb(
+            store=self.store,
+            flavor=newFlavor,
+            parent=self,
+            body=childBody,
+            title=childTitle,
+            author=childAuthor,
+            dateLastEdited=Time(),
+            hits=0)
+
+        roleToPerms = {childAuthor: [ihyperbola.IAuthor]}
+        currentBlurb = self
+        while currentBlurb is not None:
+            currentBlurb.updateFlavorPermissions(roleToPerms, newFlavor)
+            currentBlurb = currentBlurb.parent
+        firstShareID = None     # we want the shareIDs to all be the same -
+                                # since "None" will allocate a new one, we just
+                                # use this value regardless
+        for role, interfaceList in roleToPerms.items():
+            shareObj = shareItem(newBlurb, interfaces=interfaceList,
+                                 toRole=role, shareID=firstShareID)
+            firstShareID = shareObj.shareID
+        return firstShareID
+
+    def permitChildren(self, role, flavor, *interfaces):
+        FlavorPermission(
+            store=self.store,
+            flavor=flavor,
+            role=role,
+            permissions=u','.join(map(qual, interfaces)),
+            blurb=self)
+
+    def updateFlavorPermissions(self, permsdict, flav):
+        for fp in self.store.query(FlavorPermission,
+                                   AND(FlavorPermission.flavor == flav,
+                                       FlavorPermission.blurb == self)):
+            if fp.role not in permsdict:
+                # Children supersede their parents.  For example, if you want
+                # to lock comments on a particular entry, you can give it a new
+                # FlavorPermission and its parents will no longer override.
+                permsdict[fp.role] = map(namedAny, fp.permissions.split(","))
+
+
 
 
 class PastBlurb(Item):
@@ -136,4 +218,4 @@ class PastBlurb(Item):
     author = reference(reftype=Role,
                        allowNone=False)
 
-    blurb = reference(Blurb)
+    blurb = reference(reftype=Blurb)
