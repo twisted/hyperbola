@@ -1,8 +1,6 @@
-from axiom import iaxiom, userbase
+from axiom import userbase
 
 from xmantissa import website, offering, provisioning
-
-import hyperbola
 
 from hyperbola import hyperbola_model
 from hyperbola.hyperbola_theme import HyperbolaTheme
