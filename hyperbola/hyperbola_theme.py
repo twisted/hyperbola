@@ -1,13 +1,15 @@
+# -*- test-case-name: hyperbola.test.test_theme -*-
 from xmantissa import webtheme
 from nevow import tags
 
 class HyperbolaTheme(webtheme.XHTMLDirectoryTheme):
-    def head(self, website):
-        root = website.cleartextRoot()
+    def head(self, req, website):
+        root = website.cleartextRoot(req.getHeader('host'))
+        static = root.child('Hyperbola').child('static')
         yield tags.link(
-            href=root + '/Hyperbola/static/hyperbola.css',
+            href=static.child('hyperbola.css'),
             rel='stylesheet',
             type='text/css')
         yield tags.script(
-            src=root + '/Hyperbola/static/hyperbola.js',
+            src=static.child('hyperbola.js'),
             type='text/javascript')
