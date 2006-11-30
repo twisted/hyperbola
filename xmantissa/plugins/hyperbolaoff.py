@@ -23,7 +23,7 @@ plugin = offering.Offering(
 
     appPowerups = (
         ),
-    installablePowerups = (),
+
     benefactorFactories = (hyperbolaer,),
     loginInterfaces = (),
     themes = (HyperbolaTheme('base', 0),)
