@@ -5,7 +5,7 @@ from zope.interface import implements
 
 from epsilon.extime import Time
 
-from axiom.item import Item, InstallableMixin
+from axiom.item import Item 
 from axiom.attributes import integer, reference
 
 from xmantissa import ixmantissa, website, webapp, webnav, tdb, sharing
@@ -51,7 +51,7 @@ class HyperbolaBenefactor(Item):
 
 
 
-class HyperbolaPublicPresence(Item, InstallableMixin):
+class HyperbolaPublicPresence(Item):
     # This object can be browsed from the web
     implements(ixmantissa.INavigableElement)
 
@@ -60,9 +60,7 @@ class HyperbolaPublicPresence(Item, InstallableMixin):
 
     installedOn = reference()
 
-    def installOn(self, other):
-        super(HyperbolaPublicPresence, self).installOn(other)
-        other.powerUp(self, ixmantissa.INavigableElement)
+    powerupInterfaces = (ixmantissa.INavigableElement)
 
     def getTabs(self):
         return [webnav.Tab('Hyperbola', self.storeID, 0)]
