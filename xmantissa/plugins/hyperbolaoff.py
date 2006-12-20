@@ -1,14 +1,10 @@
 from axiom import userbase
 
-from xmantissa import website, offering, provisioning
+from xmantissa import website, offering
 
 from hyperbola import hyperbola_model
 from hyperbola.hyperbola_theme import HyperbolaTheme
 
-hyperbolaer = provisioning.BenefactorFactory(
-    name = u'hyperbolaer',
-    description = u'A wonderful ready to use application named Hyperbola',
-    benefactorClass = hyperbola_model.HyperbolaBenefactor)
 
 plugin = offering.Offering(
     name = u"Hyperbola",
@@ -23,8 +19,7 @@ plugin = offering.Offering(
 
     appPowerups = (
         ),
-
-    benefactorFactories = (hyperbolaer,),
+    installablePowerups = (),
     loginInterfaces = (),
     themes = (HyperbolaTheme('base', 0),)
     )
