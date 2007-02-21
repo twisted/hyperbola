@@ -1,95 +1,544 @@
+# -*- test-case-name: hyperbola.test -*-
+
+"""
+This module contains web-based views onto L{hyperbola.hyperblurb.Blurb}
+objects published by Hyperbola.
+"""
 
 from zope.interface import implements
 
-from nevow import athena
+from twisted.python.components import registerAdapter
 
-from xmantissa import ixmantissa, webtheme
+from axiom.tags import Catalog
 
-from xmantissa import tdbview, sharing, liveform
+from nevow import athena, inevow, page, tags, rend, loaders
+from nevow.flat import flatten
 
-from hyperbola.hyperblurb import Blurb, FLAVOR
+from xmantissa import ixmantissa, webtheme, websharing, website, webapp, publicresource
+
+from xmantissa import sharing, liveform
+
+from hyperbola.hyperblurb import FLAVOR
 from hyperbola import ihyperbola
 
 class HyperbolaView(athena.LiveFragment):
+    """
+    Fragment responsible for rendering the initial hyperbola page
+    """
     # This is a Fragment of a Page
     implements(ixmantissa.INavigableFragment)
 
     # This View will use the hyperbola-start.html template
     fragmentName = 'hyperbola-start'
 
-    live = 'athena'
     iface = {}
 
     def head(self):
-        # Add tags in the page <head>
-        pass
+        """
+        Override L{ixmantissa.INavigableFragment.head} to do nothing, since we
+        don't have to add anything to the header.
+        """
+        # XXX somebody kill this framework requirement please --glyph
 
 
-    def render_blogs(self, ctx, data):
-        view = tdbview.TabularDataView(
-            self.original.getTDM(),
-            [tdbview.ColumnViewBase('title', displayName='Title')])
-        view.page = self.page
-        view.docFactory = webtheme.getLoader(view.fragmentName)
-        return ctx.tag[view]
+    def render_listBlogs(self, ctx, data):
+        """
+        Render a list of all blogs.
+        """
+        return BlogListFragment(self.page, self.original)
 
 
     def render_addBlog(self, ctx, data):
+        """
+        Render an add blog form.
+        """
         return BlogAddingFragment(self.page, self.original)
 
 
 
+class BlogPostingResource(publicresource.PublicAthenaLivePage):
+    """
+    L{nevow.inevow.IResource} which wraps and renders an
+    L{AddBlogPostDialogFragment}.
+    """
+    def __init__(self, store, blog, forUser):
+        super(BlogPostingResource, self).__init__(
+            store.parent,
+            AddBlogPostDialogFragment(BlurbViewer(blog)),
+            forUser=forUser)
+
+
+
+class BlogListFragment(webtheme.ThemedElement):
+    """
+    Fragment which renders a list of all blogs
+    """
+    fragmentName = 'hyperbola-blog-list'
+
+    def __init__(self, page, hyperbola):
+        """
+        @type hyperbola: L{hyperbola.hyperbola_model.HyperbolaPublicPresence
+        """
+        self.setFragmentParent(page)
+        self.hyperbola = hyperbola
+        super(BlogListFragment, self).__init__()
+
+    def _getPostURL(self, blog):
+        """
+        Figure out a URL which could be used for posting to C{blog}
+
+        @type blog: L{xmantissa.sharing.SharedProxy}
+        @rtype: C{unicode}
+        """
+        ws = self.hyperbola.store.parent.findUnique(website.WebSite)
+        return str(ws.encryptedRoot()) + websharing.linkTo(
+            blog, self.hyperbola.store)[1:] + '/post'
+
+    def blogs(self, req, tag):
+        """
+        Render all blogs
+        """
+        p = inevow.IQ(self.docFactory).patternGenerator('blog')
+        webapp = ixmantissa.IWebTranslator(self.hyperbola.store)
+        blogs = list()
+        primaryRole = sharing.getSelfRole(self.hyperbola.store)
+        for blog in self.hyperbola.getTopLevelFor(primaryRole):
+            blogs.append(p.fillSlots(
+                'title', blog.title).fillSlots(
+                 'link', websharing.linkTo(
+                            blog, self.hyperbola.store)).fillSlots(
+                 'post-url', self._getPostURL(blog)))
+        return tag[blogs]
+    page.renderer(blogs)
+
+
+
 class BlogAddingFragment(liveform.LiveForm):
-    #fragmentName = 'hyperbola-add-blog'
-    fragmentName = None
+    """
+    Fragment which renders a form for adding a new blog
+    """
+    fragmentName = 'hyperbola-add-blog'
     jsClass = u'Hyperbola.AddBlog'
 
     def __init__(self, page, hyperbola):
-        super(BlogAddingFragment, self).__init__(self.addBlog,
-                [liveform.Parameter(
-                    'title',
-                    liveform.TEXT_INPUT,
-                    unicode,
-                    "A title for your blog",
-                    "A Blog"),
-                 liveform.Parameter(
-                    'description',
-                    liveform.TEXT_INPUT,
-                    unicode,
-                    "A description of your blog",
-                    "A Blog that I write") ])
+        super(BlogAddingFragment, self).__init__(
+            hyperbola.createBlog,
+            [liveform.Parameter(
+                'title',
+                liveform.TEXT_INPUT,
+                unicode,
+                "A title for your blog",
+                "A Blog"),
+             liveform.Parameter(
+                'description',
+                liveform.TEXT_INPUT,
+                unicode,
+                "A description of your blog",
+                "A Blog that I write")])
         self.setFragmentParent(page)
         self.hyperbola = hyperbola
-        # ideally, self.docFactory = webtheme.getLoader(self.fragmentName)
-
-    def addBlog(self, title, description):
-        store = self.hyperbola.store
-
-        blog = self.hyperbola.topPost(title, description, FLAVOR.BLOG)
-
-        authorsRole = sharing.getPrimaryRole(store, title + u' blog', True)
-        sharing.getSelfRole(store).becomeMemberOf(authorsRole)
-
-        sharing.shareItem(blog, authorsRole, shareID=u'blog')
-        sharing.shareItem(blog, sharing.getEveryoneRole(store), shareID=u'blog',
-                          interfaces=[ihyperbola.IViewer])
+        self.docFactory = webtheme.getLoader(self.fragmentName)
 
 
-class BlurbViewer(athena.LiveFragment):
+
+flavorNames = {
+    FLAVOR.BLOG_POST: 'Post',
+    FLAVOR.BLOG_COMMENT: 'Comment',
+    FLAVOR.BLOG: 'Blog',
+    FLAVOR.FORUM: 'Forum',
+    FLAVOR.FORUM_TOPIC: 'Forum Topic',
+    FLAVOR.FORUM_POST: 'Forum Post',
+    FLAVOR.WIKI: 'Wiki',
+    FLAVOR.WIKI_NODE: 'Wiki Node'}
+
+class AddCommentFragment(liveform.LiveForm):
+    """
+    Base/default fragment which renders into some UI for commenting on a blub
+    """
+    fragmentName = 'add-comment/default'
+    jsClass = u'Hyperbola.AddComment'
+
+    def __init__(self, parent):
+        self.parent = parent
+        self._commentTypeName = flavorNames[
+            FLAVOR.commentFlavors[parent.original.flavor]]
+
+        def uncsv(s):
+            if s == '':
+                return ()
+            return list(t.strip() for t in s.split(', '))
+
+        super(AddCommentFragment, self).__init__(
+            self.addComment,
+            (liveform.Parameter(
+                'title',
+                liveform.TEXT_INPUT,
+                unicode,
+                'Title'),
+             liveform.Parameter(
+                'body',
+                liveform.TEXT_INPUT,
+                unicode,
+                'Body'),
+             liveform.Parameter(
+                'tags',
+                liveform.TEXT_INPUT,
+                uncsv)))
+
+        self.docFactory = webtheme.getLoader(self.fragmentName)
+
+
+    def addComment(self, title, body, tags):
+        """
+        Add a comment blurb to our parent blurb
+
+        @param title: the title of the comment
+        @type title: C{unicode}
+
+        @param body: the body of the comment
+        @type body: C{unicode}
+
+        @param tags: tags to apply to the comment
+        @type tags: iterable of C{unicode}
+
+        @rtype: C{None}
+        """
+        shareID = self.parent.original.post(title, body, self.parent.getRole())
+        role = self.parent.getRole()
+        # is role.store correct?
+        post = sharing.getShare(role.store, role, shareID)
+        for tag in tags:
+            post.tag(tag)
+
+    def commentTypeName(self, req, tag):
+        """
+        Figure out what this type of comment would be called (e.g. a comment
+        on a blog is a 'blog post')
+        """
+        return self._commentTypeName
+    page.renderer(commentTypeName)
+
+    def head(self):
+        return None
+
+
+class AddBlogCommentFragment(AddCommentFragment):
+    """
+    L{AddCommentFragment} subclass for making comments of type
+    L{FLAVOR.BLOG_COMMENT}
+    """
+    fragmentName = 'add-comment/' + FLAVOR.BLOG_COMMENT
+
+class AddBlogPostFragment(AddCommentFragment):
+    """
+    L{AddCommentFragment} subclass for making comments of type
+    L{FLAVOR.BLOG_POST}
+    """
+    jsClass = u'Hyperbola.AddBlogPost'
+    fragmentName = 'add-comment/' + FLAVOR.BLOG_POST
+
+    def _getAllTags(self):
+        """
+        Get all the tags in the same store as the underlying item of our
+        parent blurb
+
+        @rtype: C{list} of C{unicode}
+        """
+        store = sharing.itemFromProxy(self.parent.original).store
+        return list(store.findOrCreate(Catalog).tagNames())
+
+    def getInitialArguments(self):
+        """
+        Override default implementation to include the list of all tags
+        """
+        return (self._getAllTags(),)
+
+
+
+class AddBlogPostDialogFragment(AddBlogPostFragment):
+    """
+    L{AddBlogPostFragment} subclass for making comments of type L{FLAVOR.BLOG_POST}
+    """
+    jsClass = u'Hyperbola.AddBlogPostDialog'
+    fragmentName = 'add-comment/' + FLAVOR.BLOG_POST + '-dialog'
+
+    def title(self, req, tag):
+        """
+        Determine a preset value for the title of the comment, by looking at the
+        C{title} argument in the request.
+        """
+        return req.args['title'][0]
+    page.renderer(title)
+
+    def body(self, req, tag):
+        """
+        Determine a preset value for the body of the comment, by looking at the
+        C{body} argument in the request, and inserting a link to the url
+        specified in the C{url} argument.
+        """
+        body = req.args['body'][0]
+        url = req.args['url'][0]
+        link = tags.a(href=url)[self.title(req, tag)]
+        return flatten((link, tags.br, body))
+    page.renderer(body)
+
+
+ADD_COMMENT_VIEWS = {FLAVOR.BLOG: AddBlogPostFragment,
+                     FLAVOR.BLOG_COMMENT: AddCommentFragment}
+
+def addCommentDispatcher(parent):
+    """
+    Figure out the view class that should render an add comment form for the
+    parent blurb C{parent}
+
+    @type parent: L{BlurbViewer}
+    @rtype: L{AddCommentFragment}
+    """
+    return ADD_COMMENT_VIEWS.get(
+        parent.original.flavor, AddCommentFragment)(parent)
+
+
+
+class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
+    """
+    Base/default class for rendering blurbs
+    """
     implements(ixmantissa.INavigableFragment)
-    fragmentName = 'hyperbola-view-blurb'
-    jsClass = u'Hyperbola.ViewBlurb'
+    fragmentName = 'view-blurb/default'
 
-    def __init__(self, frag):
-        super(athena.LiveFragment, self).__init__(frag)
+    customizedFor = None
+
+    def __init__(self, original, *a, **k):
+        super(BlurbViewer, self).__init__(original, *a, **k)
+        self._childTypeName = flavorNames[
+            FLAVOR.commentFlavors[original.flavor]]
 
     def customizeFor(self, username):
-        print 'blurb viewer customized for', username
+        """
+        This method is invoked with the viewing user's identification when being
+        viewed publicly.
+        """
         self.customizedFor = username
         return self
+
+
+    def getRole(self):
+        """
+        Retrieve the role currently viewing this blurb viewer.
+        """
+        item = sharing.itemFromProxy(self.original)
+        if self.customizedFor is None:
+            # If this hasn't been customized, it's public.
+            return sharing.getEveryoneRole(item.store)
+        else:
+            # Otherwise, get the primary role of the current observer.
+            return sharing.getPrimaryRole(item.store, self.customizedFor)
+
+    def child_post(self, ctx):
+        """
+        If the user is authorized, return a L{BlogPostingResource}
+        """
+        if ihyperbola.ICommentable.providedBy(self.original):
+            store = sharing.itemFromProxy(self.original).store
+            return BlogPostingResource(
+                store, self.original, self.customizedFor)
 
     def head(self):
         pass
 
-from twisted.python.components import registerAdapter
-registerAdapter(BlurbViewer, Blurb, ixmantissa.INavigableFragment)
+    def render_title(self, ctx, data):
+        """
+        @return: title of our blurb
+        """
+        return self.original.title
+
+    def render_body(self, ctx, data):
+        """
+        @return: body of our blurb
+        """
+        return tags.xml(self.original.body)
+
+    def render_dateCreated(self, ctx, data):
+        """
+        @return: creation date of our blurb
+        """
+        return self.original.dateCreated.asHumanly()
+
+    def render_childCount(self, ctx, data):
+        """
+        @return: child count of our blurb
+        """
+        # XXX
+        return sum(1 for ign in self.original.view(self.getRole()))
+
+    def render_childTypeName(self, ctx, data):
+        """
+        @return: the name of the type of our child blurbs
+        """
+        return self._childTypeName
+
+    def _getChildBlurbs(self, ctx):
+        """
+        Get the child blurbs of this blurb
+
+        @rtype: C{list} of L{xmantissa.sharing.SharedProxy}
+        """
+        return list(self.original.view(self.getRole()))
+
+    def render_view(self, ctx, data):
+        """
+        Render the child blurbs of this blurb
+        """
+        blurbs = self._getChildBlurbs(ctx)
+        if 0 < len(blurbs):
+            for blurb in blurbs:
+                f = blurbViewDispatcher(blurb)
+                f.setFragmentParent(self)
+                f.docFactory = webtheme.getLoader(f.fragmentName)
+                yield f
+        else:
+            p = inevow.IQ(self.docFactory).onePattern('no-child-blurbs')
+            yield p.fillSlots('child-type-name', self._childTypeName)
+
+    def render_addComment(self, ctx, data):
+        """
+        Render some UI for commenting on this blurb
+        """
+        if not ihyperbola.ICommentable.providedBy(self.original):
+            return ''
+        f = addCommentDispatcher(self)
+        f.setFragmentParent(self)
+        f.docFactory = webtheme.getLoader(f.fragmentName)
+        return f
+
+    def render_author(self, ctx, data):
+        """
+        Render the author of this blurb
+        """
+        # XXX this returns 'Everyone'
+        return self.original.author.externalID
+
+
+
+class BlogPostBlurbViewer(BlurbViewer):
+    """
+    L{BlurbViewer} subclass for rendering blurbs of type L{FLAVOR.BLOG_POST}
+    """
+    fragmentName = 'view-blurb/' + FLAVOR.BLOG_POST
+    jsClass = u'Hyperbola.BlogPostBlurbController'
+
+    NO_TAGS_MARKER = u'Uncategorized'
+
+    def _getSelectedTag(self, ctx):
+        """
+        Figure out which tag the user is filtering by, by looking at the URL
+
+        @rtype: C{None} or C{unicode}
+        """
+        req = inevow.IRequest(ctx)
+        tag = req.args.get('tag', [None])[0]
+        if not tag:
+            return None
+        return tag
+
+    def render_tags(self, ctx, data):
+        """
+        Render the tags of this blurb
+        """
+        iq = inevow.IQ(self.docFactory)
+        separatorPattern = iq.patternGenerator('tag-separator')
+        tags = list()
+        selectedTag = self._getSelectedTag(ctx)
+        for tag in self.original.tags():
+            if tag == selectedTag:
+                p = 'selected-tag'
+            else:
+                p = 'tag'
+            tagPattern = iq.onePattern(p)
+            tags.extend((tagPattern.fillSlots('name', tag),
+                         separatorPattern()))
+        if tags:
+            return tags[:-1]
+        return self.NO_TAGS_MARKER
+
+
+class BlogCommentBlurbViewer(BlurbViewer):
+    """
+    L{BlurbViewer} subclass for rendering blurbs of type L{FLAVOR.BLOG_COMMENT}
+    """
+    fragmentName = 'view-blurb/' + FLAVOR.BLOG_COMMENT
+
+class BlogBlurbViewer(BlurbViewer):
+    """
+    L{BlurbViewer} subclass for rendering blurbs of type L{FLAVOR.BLOG}
+    """
+    fragmentName = 'view-blurb/' + FLAVOR.BLOG
+    jsClass = u'Hyperbola.BlogBlurbController'
+
+    def _getAllTags(self):
+        """
+        Get all the tags in the same store as the underlying item of our blurb
+
+        @rtype: C{list} of C{unicode}
+        """
+        store = sharing.itemFromProxy(self.original).store
+        return list(store.findOrCreate(Catalog).tagNames())
+
+    def _getSelectedTag(self, ctx):
+        """
+        Figure out which tag the user is filtering by, by looking at the URL
+
+        @rtype: C{None} or C{unicode}
+        """
+        req = inevow.IRequest(ctx)
+        tag = req.args.get('tag', [None])[0]
+        if not tag:
+            return None
+        return tag
+
+    def _getChildBlurbs(self, ctx):
+        """
+        Get the child blurbs of this blurb, filtering by the selected tag
+
+        @rtype: C{list} of L{xmantissa.sharing.SharedProxy}
+        """
+        tag = self._getSelectedTag(ctx)
+        if tag is not None:
+            return list(self.original.viewByTag(
+                self.getRole(), tag.decode('utf-8')))
+        return list(self.original.view(self.getRole()))
+
+
+    def render_tags(self, ctx, data):
+        """
+        Render all tags
+        """
+        iq = inevow.IQ(self.docFactory)
+        selTag = self._getSelectedTag(ctx)
+        for tag in self._getAllTags():
+            if tag == selTag:
+                pattern = 'selected-tag'
+            else:
+                 pattern = 'tag'
+            yield iq.onePattern(pattern).fillSlots('name', tag)
+
+
+
+BLURB_VIEWS = {FLAVOR.BLOG_POST: BlogPostBlurbViewer,
+               FLAVOR.BLOG: BlogBlurbViewer,
+               FLAVOR.BLOG_COMMENT: BlogCommentBlurbViewer}
+
+def blurbViewDispatcher(blurb):
+    """
+    Figure out the view class that should render the blurb C{blurb}
+
+    @type blurb: L{xmantissa.sharing.SharedProxy}
+    @rtype: L{BlurbViewer}
+    """
+    return BLURB_VIEWS.get(blurb.flavor, BlurbViewer)(blurb)
+
+
+registerAdapter(
+    blurbViewDispatcher,
+    ihyperbola.IViewable,
+    ixmantissa.INavigableFragment)
