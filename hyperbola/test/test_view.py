@@ -48,3 +48,33 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
 
             (comment,) = share.view(self.role)
             self.assertEquals(set(comment.tags()), set(('t', 'a', 'gs')))
+
+    def test_parseTagsExtraneousWhitespace(self):
+        """
+        Test that L{hyperbola.hyperbola_view.AddCommentFragment.parseTags}
+        removes any whitespace surrounding the tags it is passed
+        """
+        share = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG))
+
+        parent = hyperbola_view.blurbViewDispatcher(share)
+        parent.customizeFor(self.role.externalID)
+
+        frag = hyperbola_view.AddCommentFragment(parent)
+        self.assertEquals(
+            frag.parseTags(' a , b,c,d,  '), ['a', 'b', 'c', 'd'])
+
+    def test_parseTagsAllWhitespace(self):
+        """
+        Test that L{hyperbola.hyperbola_view.AddCommentFragment.parseTags}
+        returns the empty list when given a string of whitespace
+        """
+        share = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG))
+
+        parent = hyperbola_view.blurbViewDispatcher(share)
+        parent.customizeFor(self.role.externalID)
+
+        frag = hyperbola_view.AddCommentFragment(parent)
+        self.assertEquals(
+            frag.parseTags('  '), [])

@@ -163,11 +163,6 @@ class AddCommentFragment(liveform.LiveForm):
         self._commentTypeName = flavorNames[
             FLAVOR.commentFlavors[parent.original.flavor]]
 
-        def uncsv(s):
-            if s == '':
-                return ()
-            return list(t.strip() for t in s.split(', '))
-
         super(AddCommentFragment, self).__init__(
             self.addComment,
             (liveform.Parameter(
@@ -183,10 +178,24 @@ class AddCommentFragment(liveform.LiveForm):
              liveform.Parameter(
                 'tags',
                 liveform.TEXT_INPUT,
-                uncsv)))
+                self.parseTags)))
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
 
+
+    def parseTags(self, tagString):
+        """
+        Turn a comma delimited string of tag names into a list of tag names
+
+        @type tagString: C{unicode}
+        @rtype: C{list} of C{unicode}
+        """
+        tags = list()
+        for tag in tagString.split(','):
+            tag = tag.strip()
+            if tag:
+                tags.append(tag)
+        return tags
 
     def addComment(self, title, body, tags):
         """
