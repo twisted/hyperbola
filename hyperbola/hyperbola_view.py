@@ -351,6 +351,9 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
             store = sharing.itemFromProxy(self.original).store
             return BlogPostingResource(
                 store, self.original, self.customizedFor)
+        req = inevow.IRequest(ctx)
+        req.redirect('/login')
+        return ''
 
     def head(self):
         pass
