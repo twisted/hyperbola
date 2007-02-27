@@ -473,6 +473,60 @@ class BlogPostBlurbViewer(BlurbViewer):
             return tags[:-1]
         return self.NO_TAGS_MARKER
 
+    def render_editor(self, ctx, data):
+        f = BlogPostBlurbEditor(self.original)
+        f.setFragmentParent(self)
+        f.docFactory = webtheme.getLoader(f.fragmentName)
+        return f
+
+    def render_editLink(self, ctx, data):
+        if ihyperbola.ICommentable.providedBy(self.original):
+            return ctx.tag
+        return ''
+
+
+
+class BlogPostBlurbEditor(liveform.LiveForm):
+    """
+    Fragment for rendering blog post editing UI
+    """
+    jsClass = u'Hyperbola.BlogPostBlurbEditorController'
+    fragmentName = 'edit-blog-post'
+
+    def __init__(self, blogPost):
+        super(BlogPostBlurbEditor, self).__init__(
+            lambda *a, **k: blogPost.edit(newAuthor=blogPost.author, *a, **k),
+            (liveform.Parameter(
+                'newTitle',
+                liveform.TEXT_INPUT,
+                unicode,
+                'Title',
+                default=blogPost.title),
+             liveform.Parameter(
+                'newBody',
+                liveform.TEXT_INPUT,
+                unicode,
+                'Body',
+                default=blogPost.body)))
+        self.blogPost = blogPost
+
+
+    def title(self, req, tag):
+        """
+        @return: title of our blurb
+        """
+        return self.blogPost.title
+    page.renderer(title)
+
+
+    def body(self, req, tag):
+        """
+        @return: body of our blurb
+        """
+        return self.blogPost.body
+    page.renderer(body)
+
+
 
 class BlogCommentBlurbViewer(BlurbViewer):
     """

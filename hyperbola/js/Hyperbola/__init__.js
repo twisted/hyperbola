@@ -32,6 +32,20 @@ Hyperbola.BlogPostBlurbController.methods(
             node.style.display = '';
         }
         return false;
+    },
+
+    /**
+     * Toggle the visibility of the 'edit post' form
+     */
+    function toggleEditForm(self) {
+        var node = self.firstNodeByAttribute(
+            'athena:class', 'Hyperbola.BlogPostBlurbEditorController');
+        if(node.style.display == '') {
+            node.style.display = 'none';
+        } else {
+            node.style.display = '';
+        }
+        return false;
     });
 
 Hyperbola.BlogBlurbController = Nevow.Athena.Widget.subclass('Hyperbola.BlogBlurbController');
@@ -81,4 +95,17 @@ Hyperbola.AddBlogPostDialog.methods(
     function _submittedSuccessfully(self) {
         window.focus();
         window.close();
+    });
+
+Hyperbola.BlogPostBlurbEditorController = Hyperbola._ReloadingFormWidget.subclass('Hyperbola.BlogPostBlurbEditorController');
+/**
+ * Code for responding to events related to editing of blog post blurbs
+ */
+Hyperbola.BlogPostBlurbEditorController.methods(
+    /**
+     * Hide the 'edit blog post' form
+     */
+    function hideEditForm(self) {
+        self.node.style.display = 'none';
+        return false;
     });
