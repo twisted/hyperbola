@@ -49,6 +49,23 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             (comment,) = share.view(self.role)
             self.assertEquals(set(comment.tags()), set(('t', 'a', 'gs')))
 
+    def test_addBlogPostResourceCustomized(self):
+        """
+        Test that the L{hyperbola.hyperbola_view.BlogPostingResource} is
+        customized so that the blog post that is created will have the correct
+        author
+        """
+        blog = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG))
+
+        bpr = hyperbola_view.BlogPostingResource(
+            self.store, blog, self.role.externalID)
+
+        bpr.fragment.addComment(u'', u'', ())
+
+        (comment,) = blog.view(self.role)
+        self.assertEquals(comment.author, self.role)
+
     def test_parseTagsExtraneousWhitespace(self):
         """
         Test that L{hyperbola.hyperbola_view.AddCommentFragment.parseTags}

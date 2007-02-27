@@ -62,9 +62,12 @@ class BlogPostingResource(publicresource.PublicAthenaLivePage):
     L{AddBlogPostDialogFragment}.
     """
     def __init__(self, store, blog, forUser):
+        blurbView = BlurbViewer(blog)
+        blurbView.customizeFor(forUser)
+
         super(BlogPostingResource, self).__init__(
             store.parent,
-            AddBlogPostDialogFragment(BlurbViewer(blog)),
+            AddBlogPostDialogFragment(blurbView),
             forUser=forUser)
 
 
