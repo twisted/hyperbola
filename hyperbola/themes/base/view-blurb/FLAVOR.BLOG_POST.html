@@ -31,6 +31,13 @@
     <nevow:invisible nevow:render="editLink">
       | <a href="#" onclick="return Nevow.Athena.Widget.get(this).toggleEditForm()">Edit</a>
     </nevow:invisible>
+    <nevow:invisible nevow:render="deleteLink">
+      |
+      <a href="#">
+        <athena:handler event="onclick" handler="deletePost" />
+        Delete
+      </a>
+    </nevow:invisible>
   </div>
 
   <div class="hyperbola-blog-post-comments" style="display: none">

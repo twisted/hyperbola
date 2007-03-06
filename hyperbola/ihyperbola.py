@@ -115,3 +115,9 @@ class IEditable(IViewable):
         @param tagName: the tag name
         @type tagName: C{unicode}
         """
+
+    def delete():
+        """
+        Unshare & delete this blurb, and any descendent blurbs and previous
+        versions of this blurb
+        """

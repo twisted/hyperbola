@@ -16,7 +16,7 @@ from axiom.item import Item
 from axiom.attributes import text, reference, integer, timestamp, textlist, AND
 from axiom.tags import Catalog, Tag
 
-from xmantissa.sharing import Role, shareItem, asAccessibleTo
+from xmantissa.sharing import Role, shareItem, asAccessibleTo, unShare, getSelfRole
 
 from hyperbola import ihyperbola
 
@@ -322,6 +322,17 @@ class Blurb(Item):
         @type tagName: C{unicode}
         """
         self.store.findOrCreate(Catalog).tag(self, tagName)
+
+    def delete(self):
+        """
+        Unshare & delete this blurb, and any descendent blurbs and
+        L{PastBlurb}s
+        """
+        unShare(self)
+        self.store.query(PastBlurb, PastBlurb.blurb == self).deleteFromStore()
+        for blurb in self.store.query(Blurb, Blurb.parent == self):
+            blurb.delete()
+        self.deleteFromStore()
 
 
 class PastBlurb(Item):

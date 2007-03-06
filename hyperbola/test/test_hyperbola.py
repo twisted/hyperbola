@@ -65,11 +65,13 @@ class BlurbTests(unittest.TestCase):
                        externalID=u'armstrong@example.com', description=u'foobar')
         self.you = Role(store=self.store,
                         externalID=u'radix@example.com', description=u'rad yo')
+
         blog = self.blog = hyperblurb.Blurb(
             store=self.store, title=u"Hello World",
             body=u"Hello World!~!!", author=self.me, hits=0,
             dateCreated=Time(), dateLastEdited=Time(),
             flavor=hyperblurb.FLAVOR.BLOG)
+
         blog.permitChildren(
             self.me, hyperblurb.FLAVOR.BLOG_POST, ihyperbola.ICommentable)
         blog.permitChildren(
@@ -193,6 +195,14 @@ class BlurbTests(unittest.TestCase):
         self.assertEquals(
             [p.shareID for p in self.blog.viewByTag(self.me, u'bar')],
             [post2.shareID, post1.shareID])
+
+    def test_deleteDeletesChildren(self):
+        """
+        Test that L{hyperbola.hyperblurb.Blurb.delete} deletes child blurbs
+        """
+        self.blog.post(u'', u'', self.me)
+        self.blog.delete()
+        self.assertEquals(self.store.count(hyperblurb.Blurb), 0)
 
     def tearDown(self):
         self.store.close()

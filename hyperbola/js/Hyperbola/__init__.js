@@ -46,6 +46,18 @@ Hyperbola.BlogPostBlurbController.methods(
             node.style.display = '';
         }
         return false;
+    },
+
+    /**
+     * Tell the server to do delete this post, and reload the page
+     */
+    function deletePost(self) {
+        var result = self.callRemote('delete');
+        result.addCallback(
+            function(ignored) {
+                document.location.reload();
+            });
+        return false;
     });
 
 Hyperbola.BlogBlurbController = Nevow.Athena.Widget.subclass('Hyperbola.BlogBlurbController');

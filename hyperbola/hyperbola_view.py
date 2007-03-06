@@ -487,6 +487,21 @@ class BlogPostBlurbViewer(BlurbViewer):
             return ctx.tag
         return ''
 
+    def render_deleteLink(self, ctx, data):
+        """
+        Render a delete link or not, depending on whether the user has the
+        appropriate permissions
+        """
+        if ihyperbola.IEditable.providedBy(self.original):
+            return ctx.tag
+        return ''
+
+    def delete(self):
+        """
+        Unshare and delete our blurb, and all of its children
+        """
+        self.original.delete()
+    athena.expose(delete)
 
 
 class BlogPostBlurbEditor(liveform.LiveForm):
