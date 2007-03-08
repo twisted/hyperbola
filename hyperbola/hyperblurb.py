@@ -15,6 +15,7 @@ from epsilon.extime import Time
 from axiom.item import Item
 from axiom.attributes import text, reference, integer, timestamp, textlist, AND
 from axiom.tags import Catalog, Tag
+from axiom import batch
 
 from xmantissa.sharing import Role, shareItem, asAccessibleTo, unShare, getSelfRole
 
@@ -114,7 +115,6 @@ class FlavorPermission(Item):
         A list of the names of Python interfaces that will be exposed to this
         permission's role.
         """)
-
 
 
 class Blurb(Item):
@@ -333,6 +333,21 @@ class Blurb(Item):
         for blurb in self.store.query(Blurb, Blurb.parent == self):
             blurb.delete()
         self.deleteFromStore()
+
+    def stored(self):
+        """
+        Hook the occurrence of a blurb being added to a store and notify the
+        batch processor, if one exists, of the event so that it can schedule
+        itself to handle the new blurb, if necessary.
+        """
+        source = self.store.findUnique(BlurbSource, default=None)
+        if source is not None:
+            source.itemAdded()
+
+
+
+BlurbSource = batch.processor(Blurb)
+
 
 
 class PastBlurb(Item):

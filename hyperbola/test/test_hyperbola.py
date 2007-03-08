@@ -1,4 +1,3 @@
-
 """
 This module contains tests which verify the permissioned sharing and
 viewing logic in Hyperbola.
@@ -206,3 +205,24 @@ class BlurbTests(unittest.TestCase):
 
     def tearDown(self):
         self.store.close()
+
+class BlurbSourceTestCase(unittest.TestCase):
+    """
+    Tests for L{hyperbola.hyperblurb.BlurbSource}
+    """
+    def setUp(self):
+        self.store = Store(self.mktemp())
+        self.me = Role(store=self.store,
+                       externalID=u'armstrong@example.com',
+                       description=u'foobar')
+
+    def test_blurbCreationNoSource(self):
+        """
+        Test that blurb creation goes OK when there is no
+        L{hyperbola.hyperblurb.BlurbSource} installed
+        """
+        hyperblurb.Blurb(
+            store=self.store, title=u'',
+            body=u'', author=self.me, hits=0,
+            dateCreated=Time(), dateLastEdited=Time(),
+            flavor=hyperblurb.FLAVOR.BLOG)
