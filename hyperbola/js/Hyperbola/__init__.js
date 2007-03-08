@@ -104,8 +104,8 @@ Hyperbola.AddBlogPost.methods(
 
 Hyperbola.AddBlogPostDialog = Hyperbola.AddBlogPost.subclass('Hyperbola.AddBlogPostDialog');
 Hyperbola.AddBlogPostDialog.methods(
-    function _submittedSuccessfully(self) {
-        window.focus();
+    function submit(self) {
+        Hyperbola.AddBlogPostDialog.upcall(self, 'submit');
         window.close();
     });
 
