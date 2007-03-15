@@ -6,7 +6,7 @@ from twisted.internet import defer
 
 from xmantissa import ixmantissa, webtheme
 
-from nevow.testutil import renderLivePage, FragmentWrapper
+from nevow.testutil import renderLivePage, FragmentWrapper, AccumulatingFakeRequest
 
 from hyperbola import hyperblurb, hyperbola_view
 from hyperbola.test.util import HyperbolaTestMixin
@@ -19,7 +19,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
     def setUp(self):
         self._setUpStore()
 
-    def _renderFragment(self, fragment):
+    def _renderFragment(self, fragment, *a, **k):
         """
         Render the fragment C{fragment}
 
@@ -27,7 +27,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
         rendering result
         """
         fragment.docFactory = webtheme.getLoader(fragment.fragmentName)
-        return renderLivePage(FragmentWrapper(fragment))
+        return renderLivePage(FragmentWrapper(fragment), *a, **k)
 
     def test_adaption(self):
         """
@@ -66,4 +66,24 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
             deferreds.append(self._renderFragment(
                 hyperbola_view.addCommentDispatcher(
                     hyperbola_view.blurbViewDispatcher(proxy))))
+        return defer.gatherResults(deferreds)
+
+    def test_addCommentDialogDispatch(self):
+        """
+        Test that we can pass a blurb of any flavor to
+        L{hyperbola.hyperbola_view.addCommentDialogDispatcher} and then render
+        the result
+        """
+        class RequestWithArgs(AccumulatingFakeRequest):
+            def __init__(self, *a, **k):
+                AccumulatingFakeRequest.__init__(self, *a, **k)
+                self.args = {'title': [''], 'body': [''], 'url': ['']}
+
+        deferreds = list()
+        for flavor in hyperblurb.ALL_FLAVORS:
+            proxy = self._shareAndGetProxy(self._makeBlurb(flavor))
+            deferreds.append(self._renderFragment(
+                hyperbola_view.addCommentDialogDispatcher(
+                    hyperbola_view.blurbViewDispatcher(proxy)),
+                reqFactory=RequestWithArgs))
         return defer.gatherResults(deferreds)

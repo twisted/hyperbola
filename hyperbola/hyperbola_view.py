@@ -56,18 +56,18 @@ class HyperbolaView(athena.LiveFragment):
 
 
 
-class BlogPostingResource(publicresource.PublicAthenaLivePage):
+class BlurbPostingResource(publicresource.PublicAthenaLivePage):
     """
-    L{nevow.inevow.IResource} which wraps and renders an
-    L{AddBlogPostDialogFragment}.
+    L{nevow.inevow.IResource} which wraps and renders the appropriate add
+    comment fragment for the blurb it is passed
     """
-    def __init__(self, store, blog, forUser):
-        blurbView = BlurbViewer(blog)
+    def __init__(self, store, parentBlurb, forUser):
+        blurbView = blurbViewDispatcher(parentBlurb)
         blurbView.customizeFor(forUser)
 
-        super(BlogPostingResource, self).__init__(
+        super(BlurbPostingResource, self).__init__(
             store.parent,
-            AddBlogPostDialogFragment(blurbView),
+            addCommentDialogDispatcher(blurbView),
             forUser=forUser)
 
 
@@ -309,6 +309,20 @@ def addCommentDispatcher(parent):
     return ADD_COMMENT_VIEWS.get(
         parent.original.flavor, AddCommentFragment)(parent)
 
+ADD_COMMENT_DIALOG_VIEWS = {FLAVOR.BLOG: AddBlogPostDialogFragment}
+
+def addCommentDialogDispatcher(parent):
+    """
+    Figure out the view class that should render an add comment dialog form
+    for the parent blurb C{parent}
+
+    @type parent: L{BlurbViewer}
+    @rtype: L{AddCommentDialogFragment}
+    """
+    return ADD_COMMENT_DIALOG_VIEWS.get(
+        # this isn't a sensible default
+        parent.original.flavor, AddCommentFragment)(parent)
+
 
 
 class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
@@ -348,11 +362,11 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
 
     def child_post(self, ctx):
         """
-        If the user is authorized, return a L{BlogPostingResource}
+        If the user is authorized, return a L{BlurbPostingResource}
         """
         if ihyperbola.ICommentable.providedBy(self.original):
             store = sharing.itemFromProxy(self.original).store
-            return BlogPostingResource(
+            return BlurbPostingResource(
                 store, self.original, self.customizedFor)
         req = inevow.IRequest(ctx)
         req.redirect('/login')

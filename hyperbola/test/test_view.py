@@ -16,7 +16,7 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
     def test_addComment(self):
         """
         Test adding a comment to a blurb of each flavor through
-        L{hyperbola.hyperbola_view.AddCommentFragment}
+        L{hyperbola.hyperbola_view.addCommentDispatcher}
         """
         for flavor in hyperblurb.ALL_FLAVORS:
             share = self._shareAndGetProxy(self._makeBlurb(flavor))
@@ -24,7 +24,7 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             parent = hyperbola_view.blurbViewDispatcher(share)
             parent.customizeFor(self.role.externalID)
 
-            frag = hyperbola_view.AddCommentFragment(parent)
+            frag = hyperbola_view.addCommentDispatcher(parent)
             frag.addComment(u'title', u'body!', ())
 
             (comment,) = share.view(self.role)
@@ -43,22 +43,22 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             parent = hyperbola_view.blurbViewDispatcher(share)
             parent.customizeFor(self.role.externalID)
 
-            frag = hyperbola_view.AddCommentFragment(parent)
+            frag = hyperbola_view.addCommentDispatcher(parent)
             frag.addComment(u'title', u'body!', (u't', u'a', u'gs'))
 
             (comment,) = share.view(self.role)
             self.assertEquals(set(comment.tags()), set(('t', 'a', 'gs')))
 
-    def test_addBlogPostResourceCustomized(self):
+    def test_blurbPostingResourceCustomized(self):
         """
-        Test that the L{hyperbola.hyperbola_view.BlogPostingResource} is
-        customized so that the blog post that is created will have the correct
+        Test that the L{hyperbola.hyperbola_view.BlurbPostingResource} is
+        customized so that the blurb that is created will have the correct
         author
         """
         blog = self._shareAndGetProxy(
             self._makeBlurb(hyperblurb.FLAVOR.BLOG))
 
-        bpr = hyperbola_view.BlogPostingResource(
+        bpr = hyperbola_view.BlurbPostingResource(
             self.store, blog, self.role.externalID)
 
         bpr.fragment.addComment(u'', u'', ())
