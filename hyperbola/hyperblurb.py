@@ -188,7 +188,7 @@ class Blurb(Item):
         self.dateLastEdited = editDate
         self.author = newAuthor
 
-    def post(self, childTitle, childBody, childAuthor):
+    def post(self, childTitle, childBody, childAuthor, roleToPerms=None):
         """
         Create a new child of this Blurb, with a flavor derived from the
         mapping into FLAVOR.commentFlavors of self.flavor, shared to every role
@@ -219,28 +219,30 @@ class Blurb(Item):
             dateLastEdited=Time(),
             hits=0)
 
-        # By default, the author is allowed to edit and comment upon their own
-        # entries.  Not even the owner of the area gets to edit (although they
-        # probably get to delete).
-        roleToPerms = {childAuthor: [ihyperbola.IEditable,
-                                     ihyperbola.ICommentable]}
-        currentBlurb = self
+        if roleToPerms is None:
+            # By default, the author is allowed to edit and comment upon their own
+            # entries.  Not even the owner of the area gets to edit (although they
+            # probably get to delete).
+            roleToPerms = {childAuthor: [ihyperbola.IEditable,
+                                         ihyperbola.ICommentable]}
+            currentBlurb = self
 
-        # With regards to permission, children supersede their parents.  For
-        # example, if you want to lock comments on a particular entry, you can
-        # give it a new FlavorPermission and its parents will no longer
-        # override.  We are specifically iterating upwards from the child here
-        # for this reason.
-        while currentBlurb is not None:
-            for fp in self.store.query(FlavorPermission,
-                                       AND(FlavorPermission.flavor == newFlavor,
-                                           FlavorPermission.blurb == currentBlurb)):
-                # This test makes sure the parent doesn't override by
-                # clobbering the entry in the dictionary.
-                if fp.role not in roleToPerms:
-                    roleToPerms[fp.role] = [
-                        namedAny(x.encode('ascii')) for x in fp.permissions]
-            currentBlurb = currentBlurb.parent
+            # With regards to permission, children supersede their parents.  For
+            # example, if you want to lock comments on a particular entry, you can
+            # give it a new FlavorPermission and its parents will no longer
+            # override.  We are specifically iterating upwards from the child here
+            # for this reason.
+            while currentBlurb is not None:
+                for fp in self.store.query(FlavorPermission,
+                                        AND(FlavorPermission.flavor == newFlavor,
+                                            FlavorPermission.blurb == currentBlurb)):
+                    # This test makes sure the parent doesn't override by
+                    # clobbering the entry in the dictionary.
+                    if fp.role not in roleToPerms:
+                        roleToPerms[fp.role] = [
+                            namedAny(x.encode('ascii')) for x in fp.permissions]
+                currentBlurb = currentBlurb.parent
+
         # We want the shareIDs of the same post for different roles to all be
         # the same, so that users can trade URLs - since "None" will allocate a
         # new one, we just use this value for the first iteration...

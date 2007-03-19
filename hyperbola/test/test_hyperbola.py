@@ -12,7 +12,7 @@ from epsilon.extime import Time
 from axiom.dependency import installOn
 from axiom.userbase import LoginMethod
 
-from xmantissa.sharing import Role, getShare, itemFromProxy, shareItem
+from xmantissa.sharing import Role, getShare, itemFromProxy, shareItem, NoSuchShare
 from xmantissa.sharing import getEveryoneRole, getSelfRole
 from xmantissa.publicresource import PublicAthenaLivePage
 from xmantissa.websharing import SharingIndex
@@ -202,6 +202,19 @@ class BlurbTests(unittest.TestCase):
         self.blog.post(u'', u'', self.me)
         self.blog.delete()
         self.assertEquals(self.store.count(hyperblurb.Blurb), 0)
+
+    def test_shareToAuthorOnly(self):
+        """
+        Test that creating a blurb with a single entry for the author in the
+        C{roleToPerms} dictionary results in a share that can't be accessed by
+        anybody else
+        """
+        shareID = self.blog.post(
+            u'', u'', self.me, {self.me: [ihyperbola.IViewable]})
+        self.failUnless(getShare(self.store, self.me, shareID))
+        self.assertRaises(
+            NoSuchShare,
+            lambda: getShare(self.store, self.you, shareID))
 
     def tearDown(self):
         self.store.close()

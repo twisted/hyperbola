@@ -65,7 +65,7 @@ class ICommentable(IViewable):
     This interfaces comprises the methods which are available on a blurb which
     can be commented upon.
     """
-    def post(childTitle, childBody, childAuthor):
+    def post(childTitle, childBody, childAuthor, roleToPerms=None):
         """
         Create a subordinate IViewable provider in the same database as this
         L{ICommentable}.
@@ -79,6 +79,17 @@ class ICommentable(IViewable):
         @param childAuthor: the primary role of the entity which is attempting
         to create the child posting.
         @type childAuthor: L{xmantissa.sharing.Role}
+
+        @param roleToPerms: a mapping of roles to permissions.  if supplied,
+        these permissions will override the default permissions, and any
+        persistent permissions
+        @type roleToPerms: C{dict} mapping L{xmantissa.sharing.Role} to
+        C{lists} of L{zope.interface.Interface}
+
+        @param ignorePersistentPerms: ignore any
+        L{hyperbola.hyperblurb.FlavorPermission} objects that pertain to this
+        blurb or any of its ancestors
+        @type ignorePersistentPerms: boolean
 
         @rtype: L{unicode}
         @return: The shareID of the new L{IViewable} provider.
