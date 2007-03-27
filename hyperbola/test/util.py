@@ -25,7 +25,7 @@ class HyperbolaTestMixin:
             externalID=u'foo@host', description=u'foo')
         self.store = store
 
-    def _makeBlurb(self, flavor):
+    def _makeBlurb(self, flavor, body=None):
         """
         Make a minimal nonsense blurb with flavor C{flavor}
 
@@ -33,12 +33,17 @@ class HyperbolaTestMixin:
         @type flavor: one of the C{unicode} L{hyperbola.hyperblurb.FLAVOR}
         constants
 
+        @param body: the blurb body.  defaults to C{flavor}
+        @type body: C{unicode}
+
         @rtype: L{hyperbola.hyperblurb.Blurb}
         """
+        if body is None:
+            body = flavor
         return hyperblurb.Blurb(
             store=self.store,
             title=flavor,
-            body=flavor,
+            body=body,
             flavor=flavor,
             dateCreated=Time(),
             author=self.role)

@@ -1,10 +1,16 @@
 """
 Tests for Hyperbola view logic
 """
+from xml.dom import minidom
+
 from twisted.trial.unittest import TestCase
 
 from hyperbola import hyperbola_view, hyperblurb
 from hyperbola.test.util import HyperbolaTestMixin
+
+from nevow.testutil import FragmentWrapper, renderLivePage
+from nevow import loaders, tags
+from nevow.flat import flatten
 
 class ViewTestCase(TestCase, HyperbolaTestMixin):
     """
@@ -95,3 +101,46 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         frag = hyperbola_view.AddCommentFragment(parent)
         self.assertEquals(
             frag.parseTags('  '), [])
+
+    def test_htmlifyLineBreaks(self):
+        """
+        Test that L{hyperbola.hyperbola_view.BlurbViewer._htmlifyLineBreaks}
+        replaces new lines with <br> elements
+        """
+        share = self._shareAndGetProxy(
+            self._makeBlurb(
+                hyperblurb.FLAVOR.BLOG_POST,
+                body=u'foo\nbar\r\nbaz'))
+
+        frag = hyperbola_view.blurbViewDispatcher(share)
+        self.assertEquals(
+            flatten(frag._htmlifyLineBreaks(frag.original.body)),
+            'foo<br />bar<br />baz<br />')
+
+    def test_htmlBlurbBody(self):
+        """
+        Test that we can set and retrieve a blurb body containing HTML through
+        the view APIs
+        """
+        share = self._shareAndGetProxy(
+            self._makeBlurb(
+                hyperblurb.FLAVOR.BLOG))
+
+        parent = hyperbola_view.blurbViewDispatcher(share)
+        parent.customizeFor(self.role.externalID)
+
+        commenter = hyperbola_view.addCommentDispatcher(parent)
+        commenter.addComment(u'title', u'<div>body</div>', ())
+
+        (post,) = share.view(self.role)
+        postFragment = hyperbola_view.blurbViewDispatcher(post)
+
+        postFragment.docFactory = loaders.stan(tags.directive('body'))
+        def gotHTML(html):
+            doc = minidom.parseString(html)
+            divs = doc.getElementsByTagName('div')
+            self.assertEquals(len(divs), 1)
+            self.assertEquals(divs[0].firstChild.nodeValue, 'body')
+        D = renderLivePage(FragmentWrapper(postFragment))
+        D.addCallback(gotHTML)
+        return D

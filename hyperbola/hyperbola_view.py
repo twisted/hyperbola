@@ -381,11 +381,18 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         return self.original.title
 
+    def _htmlifyLineBreaks(self, body):
+        """
+        Replace line breaks with <br> elements
+        """
+        return [(tags.xml(line), tags.br) for line
+                    in self.original.body.splitlines()]
+
     def render_body(self, ctx, data):
         """
         @return: body of our blurb
         """
-        return tags.xml(self.original.body)
+        return self._htmlifyLineBreaks(self.original.body)
 
     def render_dateCreated(self, ctx, data):
         """
