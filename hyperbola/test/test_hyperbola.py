@@ -216,6 +216,21 @@ class BlurbTests(unittest.TestCase):
             NoSuchShare,
             lambda: getShare(self.store, self.you, shareID))
 
+    def test_editPermsAuthorOnly(self):
+        """
+        Test that creating a blurb with the default permissions and then
+        editing the perms to only allow the author to view the post results in
+        a share that can't be accessed by anybody else
+        """
+        shareID = self.blog.post(u'', u'', self.me)
+        share = getShare(self.store, self.me, shareID)
+        shareID = itemFromProxy(share).editPermissions(
+            {self.me: [ihyperbola.IViewable]})
+        share = getShare(self.store, self.me, shareID)
+        self.assertRaises(
+            NoSuchShare,
+            lambda: getShare(self.store, self.you, shareID))
+
     def tearDown(self):
         self.store.close()
 
