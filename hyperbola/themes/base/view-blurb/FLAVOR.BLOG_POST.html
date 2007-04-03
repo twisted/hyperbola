@@ -33,10 +33,22 @@
     </nevow:invisible>
     <nevow:invisible nevow:render="deleteLink">
       |
-      <a href="#">
-        <athena:handler event="onclick" handler="deletePost" />
+      <a href="#" class="delete-link">
+        <athena:handler event="onclick" handler="showDeleteConfirmation" />
         Delete
       </a>
+      <span class="confirm-delete" style="display: none">
+        Are you sure?
+        <a href="#">
+          <athena:handler event="onclick" handler="deletePost" />
+          Yes
+        </a>
+        &#160;
+        <a href="#">
+          <athena:handler event="onclick" handler="hideDeleteConfirmation" />
+          No
+        </a>
+      </span>
     </nevow:invisible>
   </div>
 

@@ -49,6 +49,25 @@ Hyperbola.BlogPostBlurbController.methods(
     },
 
     /**
+     * Show the delete confirmation DOM node
+     */
+    function showDeleteConfirmation(self, node) {
+        self.firstNodeByAttribute(
+            'class', 'confirm-delete').style.display = '';
+        node.style.display = 'none';
+        return false;
+    },
+
+    /**
+     * Hide the delete confirmation DOM node
+     */
+    function hideDeleteConfirmation(self, node) {
+        node.parentNode.style.display = 'none';
+        self.firstNodeByAttribute(
+            'class', 'delete-link').style.display = '';
+    },
+
+    /**
      * Tell the server to do delete this post, and reload the page
      */
     function deletePost(self) {
