@@ -2,6 +2,7 @@ from epsilon.extime import Time
 
 from axiom.store import Store
 from axiom.dependency import installOn
+from axiom.userbase import LoginMethod
 
 from xmantissa import sharing
 
@@ -20,12 +21,22 @@ class HyperbolaTestMixin:
         """
         store = Store()
         installOn(HyperbolaPublicPresence(store=store), store)
+        LoginMethod(
+            store=store,
+            localpart=u'user',
+            domain=u'localhost',
+            protocol=u'*',
+            verified=False,
+            internal=True,
+            account=store)
+
         self.role = sharing.Role(
             store=store,
             externalID=u'foo@host', description=u'foo')
+
         self.store = store
 
-    def _makeBlurb(self, flavor, body=None):
+    def _makeBlurb(self, flavor, title=None, body=None):
         """
         Make a minimal nonsense blurb with flavor C{flavor}
 
@@ -33,16 +44,21 @@ class HyperbolaTestMixin:
         @type flavor: one of the C{unicode} L{hyperbola.hyperblurb.FLAVOR}
         constants
 
+        @param title: the blurb title.  defaults to C{flavor}
+        @type title: C{unicode}
+
         @param body: the blurb body.  defaults to C{flavor}
         @type body: C{unicode}
 
         @rtype: L{hyperbola.hyperblurb.Blurb}
         """
+        if title is None:
+            title = flavor
         if body is None:
             body = flavor
         return hyperblurb.Blurb(
             store=self.store,
-            title=flavor,
+            title=title,
             body=body,
             flavor=flavor,
             dateCreated=Time(),

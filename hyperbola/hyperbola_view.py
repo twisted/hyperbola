@@ -455,8 +455,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         return self.original.author.externalID
 
 
-
-class BlogPostBlurbViewer(BlurbViewer):
+class _BlogPostBlurbViewer(BlurbViewer):
     """
     L{BlurbViewer} subclass for rendering blurbs of type L{FLAVOR.BLOG_POST}
     """
@@ -476,6 +475,16 @@ class BlogPostBlurbViewer(BlurbViewer):
         if not tag:
             return None
         return tag
+
+    def render_titleLink(self, ctx, data):
+        """
+        @return: title of our blurb
+        """
+        url = websharing.linkTo(
+            self.original, sharing.itemFromProxy(self.original).store)
+        return ctx.tag.fillSlots(
+            'link', url + '/detail').fillSlots(
+            'title', self.original.title)
 
     def render_tags(self, ctx, data):
         """
@@ -523,6 +532,44 @@ class BlogPostBlurbViewer(BlurbViewer):
         """
         self.original.delete()
     athena.expose(delete)
+
+
+
+class BlogPostBlurbViewer(_BlogPostBlurbViewer):
+    def child_detail(self, ctx):
+        """
+        Return a L{BlogPostBlurbViewerDetail} for this blog post
+        """
+        f = blurbViewDetailDispatcher(self.original)
+        f.customizeFor(self.customizedFor)
+        f.docFactory = webtheme.getLoader(f.fragmentName)
+
+        return publicresource.PublicAthenaLivePage(
+            sharing.itemFromProxy(self.original).store.parent,
+            f,
+            forUser=self.customizedFor)
+
+
+
+class BlogPostBlurbViewerDetail(_BlogPostBlurbViewer):
+    """
+    L{_BlogPostBlurbViewer} subclass which includes renderers specific to the
+    detail page
+    """
+    fragmentName = 'view-blurb/detail/' + FLAVOR.BLOG_POST
+
+    def render_blogTitle(self, ctx, data):
+        """
+        Return the title of the blog our blurb was posted in
+        """
+        return self.original.parent.title
+
+    def render_blogBody(self, ctx, data):
+        """
+        Return the body (subtitle) of the blog our blurb was posted in
+        """
+        return self.original.parent.body
+
 
 
 class BlogPostBlurbEditor(liveform.LiveForm):
@@ -633,6 +680,8 @@ BLURB_VIEWS = {FLAVOR.BLOG_POST: BlogPostBlurbViewer,
                FLAVOR.BLOG: BlogBlurbViewer,
                FLAVOR.BLOG_COMMENT: BlogCommentBlurbViewer}
 
+
+
 def blurbViewDispatcher(blurb):
     """
     Figure out the view class that should render the blurb C{blurb}
@@ -643,7 +692,23 @@ def blurbViewDispatcher(blurb):
     return BLURB_VIEWS.get(blurb.flavor, BlurbViewer)(blurb)
 
 
+
 registerAdapter(
     blurbViewDispatcher,
     ihyperbola.IViewable,
     ixmantissa.INavigableFragment)
+
+
+
+BLURB_DETAIL_VIEWS = {FLAVOR.BLOG_POST: BlogPostBlurbViewerDetail}
+
+
+
+def blurbViewDetailDispatcher(blurb):
+    """
+    Figure out the view class that should render the blurb detail for C{blurb}
+
+    @type blurb: L{xmantissa.sharing.SharedProxy}
+    @rtype: L{BlurbViewer}
+    """
+    return BLURB_DETAIL_VIEWS.get(blurb.flavor, BlurbViewer)(blurb)

@@ -57,7 +57,7 @@
     text-align: left;
 }
 
-.hyperbola-blog {
+.hyperbola-blog, .hyperbola-blog-post-detail {
     border: solid 1px #000000;
     padding: 20px 60px 20px 20px;
 }
