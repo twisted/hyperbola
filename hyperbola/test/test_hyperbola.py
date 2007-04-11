@@ -98,12 +98,26 @@ class BlurbTests(unittest.TestCase):
         self.assertIdentical(sharedComment.parent, itemFromProxy(sharedPost))
         self.assertRaises(AttributeError,
                           lambda: sharedPost.edit(
-                u'Ima Haxer', u'Haxed u', self.you))
+                u'Ima Haxer', u'Haxed u', self.you, ()))
         newTitle = u'My Comment To Your Post'
         newBody = u'Your Blog Sucks, man'
-        sharedComment.edit(newTitle, newBody, self.you)
+        sharedComment.edit(newTitle, newBody, self.you, ())
         self.assertEquals(sharedComment.body, newBody)
         self.assertEquals(sharedComment.title, newTitle)
+
+
+    def test_editTags(self):
+        """
+        Test that L{hyperbola.hyperblurb.Blurb.edit} changes the tags of the
+        blurb
+        """
+        postShareID = self.blog.post(u'', u'', self.me)
+        sharedPost = getShare(self.store, self.me, postShareID)
+        sharedPost.tag(u'foo')
+        sharedPost.tag(u'bar')
+        self.assertEquals(set(sharedPost.tags()), set(('foo', 'bar')))
+        sharedPost.edit(u'', u'', self.me, (u'foo', u'baz'))
+        self.assertEquals(set(sharedPost.tags()), set(('foo', 'baz')))
 
 
     def test_viewability(self):

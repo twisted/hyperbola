@@ -168,7 +168,7 @@ class Blurb(Item):
     flavor = text(doc="One of FLAVOR's capitalized attributes.",
                   allowNone=False)
 
-    def edit(self, newTitle, newBody, newAuthor):
+    def edit(self, newTitle, newBody, newAuthor, newTags):
         """
         Edit an existing blurb, saving a PastBlurb of its current state for
         rollback purposes.
@@ -176,17 +176,27 @@ class Blurb(Item):
         # Edit is only called on subsequent edits, not the first time, so we
         # need to save our current contents as history.
         editDate = Time()
-        PastBlurb(store=self.store,
-                  title=self.title,
-                  body=self.body,
-                  author=self.author,
-                  blurb=self,
-                  dateEdited=self.dateLastEdited,
-                  hits=self.hits)
+        pb = PastBlurb(
+            store=self.store,
+            title=self.title,
+            body=self.body,
+            author=self.author,
+            blurb=self,
+            dateEdited=self.dateLastEdited,
+            hits=self.hits)
+
+        catalog = self.store.findOrCreate(Catalog)
+        for tag in self.tags():
+            catalog.tag(pb, tag)
+
         self.title = newTitle
         self.body = newBody
         self.dateLastEdited = editDate
         self.author = newAuthor
+
+        self.store.query(Tag, Tag.object == self).deleteFromStore()
+        for tag in newTags:
+            catalog.tag(self, tag)
 
     def editPermissions(self, roleToPerms):
         """

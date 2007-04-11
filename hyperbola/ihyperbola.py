@@ -102,7 +102,7 @@ class IEditable(IViewable):
     This interface comprises the methods which are available on a blurb which
     can be edited directly.
     """
-    def edit(newTitle, newBody, newAuthor):
+    def edit(newTitle, newBody, newAuthor, newTags):
         """
         Change the contents of this blurb to refer to a new body, title, and
         author.
@@ -116,6 +116,9 @@ class IEditable(IViewable):
         @param newAuthor: the primary role of the entity which is attempting
         to create the child posting.
         @type newAuthor: L{xmantissa.sharing.Role}
+
+        @param newTags: the tags of the new blurb
+        @type newTags: sequence of C{unicode}
         """
 
 

@@ -9,7 +9,7 @@ from zope.interface import implements
 
 from twisted.python.components import registerAdapter
 
-from axiom.tags import Catalog
+from axiom.tags import Catalog, Tag
 
 from nevow import athena, inevow, page, tags, rend, loaders
 from nevow.flat import flatten
@@ -18,7 +18,7 @@ from xmantissa import ixmantissa, webtheme, websharing, website, webapp, publicr
 
 from xmantissa import sharing, liveform
 
-from hyperbola.hyperblurb import FLAVOR
+from hyperbola.hyperblurb import FLAVOR, Blurb
 from hyperbola import ihyperbola
 
 class HyperbolaView(athena.LiveFragment):
@@ -154,6 +154,24 @@ flavorNames = {
     FLAVOR.WIKI: 'Wiki',
     FLAVOR.WIKI_NODE: 'Wiki Node'}
 
+
+
+def parseTags(tagString):
+    """
+    Turn a comma delimited string of tag names into a list of tag names
+
+    @type tagString: C{unicode}
+    @rtype: C{list} of C{unicode}
+    """
+    tags = list()
+    for tag in tagString.split(','):
+        tag = tag.strip()
+        if tag:
+            tags.append(tag)
+    return tags
+
+
+
 class AddCommentFragment(liveform.LiveForm):
     """
     Base/default fragment which renders into some UI for commenting on a blub
@@ -181,24 +199,10 @@ class AddCommentFragment(liveform.LiveForm):
              liveform.Parameter(
                 'tags',
                 liveform.TEXT_INPUT,
-                self.parseTags)))
+                parseTags)))
 
         self.docFactory = webtheme.getLoader(self.fragmentName)
 
-
-    def parseTags(self, tagString):
-        """
-        Turn a comma delimited string of tag names into a list of tag names
-
-        @type tagString: C{unicode}
-        @rtype: C{list} of C{unicode}
-        """
-        tags = list()
-        for tag in tagString.split(','):
-            tag = tag.strip()
-            if tag:
-                tags.append(tag)
-        return tags
 
     def addComment(self, title, body, tags):
         """
@@ -585,15 +589,15 @@ class BlogPostBlurbEditor(liveform.LiveForm):
             (liveform.Parameter(
                 'newTitle',
                 liveform.TEXT_INPUT,
-                unicode,
-                'Title',
-                default=blogPost.title),
+                unicode),
              liveform.Parameter(
                 'newBody',
                 liveform.TEXT_INPUT,
-                unicode,
-                'Body',
-                default=blogPost.body)))
+                unicode),
+             liveform.Parameter(
+                'newTags',
+                liveform.TEXT_INPUT,
+                parseTags)))
         self.blogPost = blogPost
 
 
@@ -613,6 +617,14 @@ class BlogPostBlurbEditor(liveform.LiveForm):
     page.renderer(body)
 
 
+    def tags(self, req, tag):
+        """
+        @return tags of our blurb
+        """
+        return ', '.join(self.blogPost.tags())
+    page.renderer(tags)
+
+
 
 class BlogCommentBlurbViewer(BlurbViewer):
     """
@@ -629,12 +641,15 @@ class BlogBlurbViewer(BlurbViewer):
 
     def _getAllTags(self):
         """
-        Get all the tags in the same store as the underlying item of our blurb
+        Get all the tags which have been applied to blurbs in the same store
+        as the underlying item of our blurb
 
         @rtype: C{list} of C{unicode}
         """
         store = sharing.itemFromProxy(self.original).store
-        return list(store.findOrCreate(Catalog).tagNames())
+        # query instead of using Catalog so that tags only applied to
+        # PastBlurb items don't get included
+        return list(store.query(Tag, Tag.object == Blurb.storeID).getColumn('name'))
 
     def _getSelectedTag(self, ctx):
         """
