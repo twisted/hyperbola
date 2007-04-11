@@ -507,7 +507,7 @@ class _BlogPostBlurbViewer(BlurbViewer):
         return self.NO_TAGS_MARKER
 
     def render_editor(self, ctx, data):
-        f = BlogPostBlurbEditor(self.original)
+        f = editBlurbDispatcher(self.original)
         f.setFragmentParent(self)
         f.docFactory = webtheme.getLoader(f.fragmentName)
         return f
@@ -712,3 +712,20 @@ def blurbViewDetailDispatcher(blurb):
     @rtype: L{BlurbViewer}
     """
     return BLURB_DETAIL_VIEWS.get(blurb.flavor, BlurbViewer)(blurb)
+
+
+
+EDIT_BLURB_VIEWS = {FLAVOR.BLOG_POST: BlogPostBlurbEditor}
+
+
+
+def editBlurbDispatcher(blurb):
+    """
+    Figure out the view class that should render the edit blurb form for
+    C{blurb}
+
+    @type blurb: L{xmantissa.sharing.SharedProxy}
+    @rtype: L{BlogPostBlurbEditor}
+    """
+    # not a great default for now
+    return EDIT_BLURB_VIEWS.get(blurb.flavor, BlogPostBlurbEditor)(blurb)

@@ -147,3 +147,16 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
                     hyperbola_view.blurbViewDispatcher(proxy)),
                 reqFactory=RequestWithArgs))
         return defer.gatherResults(deferreds)
+
+    def test_editBlurbDispatch(self):
+        """
+        Test that we can pass a blurb of any flavor to
+        L{hyperbola.hyperbola_view.editBlurbDispatcher} and then render the
+        result
+        """
+        deferreds = list()
+        for flavor in hyperblurb.ALL_FLAVORS:
+            proxy = self._shareAndGetProxy(self._makeBlurb(flavor))
+            deferreds.append(self._renderFragment(
+                hyperbola_view.editBlurbDispatcher(proxy)))
+        return defer.gatherResults(deferreds)
