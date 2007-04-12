@@ -94,8 +94,7 @@ class BlogListFragment(webtheme.ThemedElement):
         @rtype: C{unicode}
         """
         ws = self.hyperbola.store.parent.findUnique(website.WebSite)
-        return str(ws.encryptedRoot()) + websharing.linkTo(
-            blog, self.hyperbola.store)[1:] + '/post'
+        return str(ws.encryptedRoot()) + websharing.linkTo(blog)[1:] + '/post'
 
     def blogs(self, req, tag):
         """
@@ -107,10 +106,9 @@ class BlogListFragment(webtheme.ThemedElement):
         primaryRole = sharing.getSelfRole(self.hyperbola.store)
         for blog in self.hyperbola.getTopLevelFor(primaryRole):
             blogs.append(p.fillSlots(
-                'title', blog.title).fillSlots(
-                 'link', websharing.linkTo(
-                            blog, self.hyperbola.store)).fillSlots(
-                 'post-url', self._getPostURL(blog)))
+                    'title', blog.title).fillSlots(
+                    'link', websharing.linkTo(blog)).fillSlots(
+                    'post-url', self._getPostURL(blog)))
         return tag[blogs]
     page.renderer(blogs)
 
@@ -484,8 +482,7 @@ class _BlogPostBlurbViewer(BlurbViewer):
         """
         @return: title of our blurb
         """
-        url = websharing.linkTo(
-            self.original, sharing.itemFromProxy(self.original).store)
+        url = websharing.linkTo(self.original)
         return ctx.tag.fillSlots(
             'link', url + '/detail').fillSlots(
             'title', self.original.title)
