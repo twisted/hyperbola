@@ -639,14 +639,15 @@ class BlogBlurbViewer(BlurbViewer):
     def _getAllTags(self):
         """
         Get all the tags which have been applied to blurbs in the same store
-        as the underlying item of our blurb
+        as the underlying item of our blurb.
 
         @rtype: C{list} of C{unicode}
         """
         store = sharing.itemFromProxy(self.original).store
         # query instead of using Catalog so that tags only applied to
         # PastBlurb items don't get included
-        return list(store.query(Tag, Tag.object == Blurb.storeID).getColumn('name'))
+        return list(store.query(
+            Tag, Tag.object == Blurb.storeID).getColumn('name').distinct())
 
     def _getSelectedTag(self, ctx):
         """

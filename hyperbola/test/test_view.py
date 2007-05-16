@@ -130,3 +130,28 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         D = renderLivePage(FragmentWrapper(postFragment))
         D.addCallback(gotHTML)
         return D
+
+
+    def test_blogTags(self):
+        """
+        Test that the implementation of C{_getAllTags} on the view for a blog
+        post returns all tags that have been applied to blurbs, without
+        duplicates
+        """
+        postShare = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG_POST))
+        postShare.tag(u'foo')
+
+        otherPostShare = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG_POST))
+        otherPostShare.tag(u'foo')
+        otherPostShare.tag(u'bar')
+
+        blogShare = self._shareAndGetProxy(
+            self._makeBlurb(hyperblurb.FLAVOR.BLOG))
+        blogView = hyperbola_view.blurbViewDispatcher(blogShare)
+
+        self.assertEquals(
+            list(sorted(blogView._getAllTags())),
+            [u'bar', u'foo'])
+
