@@ -514,7 +514,7 @@ class _BlogPostBlurbViewer(BlurbViewer):
         return f
 
     def render_editLink(self, ctx, data):
-        if ihyperbola.ICommentable.providedBy(self.original):
+        if ihyperbola.IEditable.providedBy(self.original):
             return ctx.tag
         return ''
 

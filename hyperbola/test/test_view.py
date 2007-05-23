@@ -5,7 +5,12 @@ from xml.dom import minidom
 
 from twisted.trial.unittest import TestCase
 
-from hyperbola import hyperbola_view, hyperblurb
+from nevow import context, tags
+
+from xmantissa.webtheme import getLoader
+from xmantissa import sharing
+
+from hyperbola import hyperbola_view, hyperblurb, ihyperbola
 from hyperbola.test.util import HyperbolaTestMixin
 
 from nevow.testutil import FragmentWrapper, renderLivePage
@@ -155,3 +160,22 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             list(sorted(blogView._getAllTags())),
             [u'bar', u'foo'])
 
+
+    def test_editLinkIfEditable(self):
+        """
+        Test that L{hyperbola_view.BlogPostBlurbViewer} renders an 'edit' link
+        if the underlying blurb is editable.
+        """
+        post = self._makeBlurb(hyperblurb.FLAVOR.BLOG_POST)
+
+        authorShareID = sharing.shareItem(
+            post, toRole=sharing.getSelfRole(self.store),
+            interfaces=[ihyperbola.IEditable]).shareID
+        authorPostShare = sharing.getShare(
+            self.store, sharing.getSelfRole(self.store), authorShareID)
+
+        authorPostView = hyperbola_view.blurbViewDispatcher(authorPostShare)
+        THE_TAG = tags.invisible(foo='bar')
+        result = authorPostView.render_editLink(
+            context.WebContext(tag=THE_TAG), None)
+        self.assertIdentical(result, THE_TAG)
