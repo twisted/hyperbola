@@ -12,10 +12,11 @@ from twisted.python.components import registerAdapter
 from axiom.tags import Catalog, Tag
 
 from nevow import athena, inevow, page, tags, rend, loaders
+from nevow.url import URL
 from nevow.flat import flatten
 
 from xmantissa import ixmantissa, webtheme, websharing, website, webapp, publicresource
-
+from xmantissa.publicweb import LoginPage
 from xmantissa import sharing, liveform
 
 from hyperbola.hyperblurb import FLAVOR, Blurb
@@ -366,13 +367,11 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         If the user is authorized, return a L{BlurbPostingResource}
         """
+        store = sharing.itemFromProxy(self.original).store
         if ihyperbola.ICommentable.providedBy(self.original):
-            store = sharing.itemFromProxy(self.original).store
             return BlurbPostingResource(
                 store, self.original, self.customizedFor)
-        req = inevow.IRequest(ctx)
-        req.redirect('/login')
-        return ''
+        return LoginPage.fromRequest(store.parent, inevow.IRequest(ctx))
 
     def head(self):
         pass

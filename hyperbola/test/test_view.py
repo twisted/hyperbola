@@ -3,17 +3,27 @@ Tests for Hyperbola view logic
 """
 from xml.dom import minidom
 
+from zope.interface import directlyProvides
+
 from twisted.trial.unittest import TestCase
 
 from nevow import context, tags
 
+from axiom.store import Store
+
 from xmantissa.webtheme import getLoader
 from xmantissa import sharing
+from xmantissa.sharing import SharedProxy
+from xmantissa.publicweb import LoginPage
+from xmantissa.ixmantissa import IStaticShellContent
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
+from hyperbola.hyperblurb import FLAVOR
+from hyperbola.hyperbola_view import BlurbViewer
+from hyperbola.ihyperbola import IViewable
 from hyperbola.test.util import HyperbolaTestMixin
 
-from nevow.testutil import FragmentWrapper, renderLivePage
+from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
 from nevow import loaders, tags
 from nevow.flat import flatten
 
@@ -179,3 +189,45 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         result = authorPostView.render_editLink(
             context.WebContext(tag=THE_TAG), None)
         self.assertIdentical(result, THE_TAG)
+
+
+class BlurbViewerTests(TestCase):
+    """
+    Tests for L{BlurbViewer}.
+    """
+    def test_postWithoutPrivileges(self):
+        """
+        Attempting to post to a blog should result in a L{LoginPage} which
+        remembers the parameters of the attempted post.
+        """
+        class StubBlurb(object):
+            """
+            L{Blurb}-alike for testing purposes.
+            """
+            def __init__(self, store, flavor):
+                self.store = store
+                self.flavor = flavor
+
+        store = Store()
+
+        # XXX IStaticShellContent needs to go.
+        class ParentStore(object):
+            pass
+        store.parent = ParentStore()
+        directlyProvides(store.parent, IStaticShellContent)
+
+        currentSegments = ['foo', 'bar']
+        postSegments = ['post', 'baz']
+        arguments = {'quux': ['1', '2']}
+        request = FakeRequest(
+            uri='/'.join([''] + currentSegments + postSegments),
+            currentSegments=currentSegments, args=arguments)
+        blurb = StubBlurb(store, FLAVOR.BLOG)
+        sharedBlurb = SharedProxy(blurb, (IViewable,), 'abc')
+        view = BlurbViewer(sharedBlurb)
+        child, segments = view.locateChild(request, postSegments)
+        self.assertTrue(isinstance(child, LoginPage))
+        self.assertEqual(child.segments, currentSegments + postSegments[:1])
+        self.assertEqual(child.arguments, arguments)
+        self.assertEqual(segments, postSegments[1:])
+        self.assertIdentical(child.staticContent, store.parent)
