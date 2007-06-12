@@ -20,7 +20,8 @@ class HyperbolaTestMixin:
         dependencies, and create a role
         """
         store = Store()
-        installOn(HyperbolaPublicPresence(store=store), store)
+        self.publicPresence = HyperbolaPublicPresence(store=store)
+        installOn(self.publicPresence, store)
         LoginMethod(
             store=store,
             localpart=u'user',

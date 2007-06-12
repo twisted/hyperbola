@@ -15,12 +15,13 @@ from nevow import athena, inevow, page, tags, rend, loaders
 from nevow.url import URL
 from nevow.flat import flatten
 
+from epsilon.extime import Time
 from xmantissa import ixmantissa, webtheme, websharing, website, webapp, publicresource
 from xmantissa.publicweb import LoginPage
 from xmantissa import sharing, liveform
 
 from hyperbola.hyperblurb import FLAVOR, Blurb
-from hyperbola import ihyperbola
+from hyperbola import ihyperbola, rss
 
 class HyperbolaView(athena.LiveFragment):
     """
@@ -422,20 +423,26 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         return list(self.original.view(self.getRole()))
 
+    def _getChildBlurbViews(self, blurbs):
+        """
+        Collect the view objects for these child blurbs.
+        """
+        for blurb in blurbs:
+            f = blurbViewDispatcher(blurb)
+            f.setFragmentParent(self)
+            f.docFactory = webtheme.getLoader(f.fragmentName)
+            yield f
+
     def render_view(self, ctx, data):
         """
         Render the child blurbs of this blurb
         """
         blurbs = self._getChildBlurbs(ctx)
         if 0 < len(blurbs):
-            for blurb in blurbs:
-                f = blurbViewDispatcher(blurb)
-                f.setFragmentParent(self)
-                f.docFactory = webtheme.getLoader(f.fragmentName)
-                yield f
+            return self._getChildBlurbViews(blurbs)
         else:
             p = inevow.IQ(self.docFactory).onePattern('no-child-blurbs')
-            yield p.fillSlots('child-type-name', self._childTypeName)
+            return [p.fillSlots('child-type-name', self._childTypeName)]
 
     def render_addComment(self, ctx, data):
         """
@@ -454,7 +461,17 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         # XXX this returns 'Everyone'
         return self.original.author.externalID
+    def _absoluteURL(self):
+        """
+        Return the absolute URL the websharing system makes this blurb
+        available at.
+        """
+        subStore = sharing.itemFromProxy(self.original).store
+        ws = subStore.parent.findUnique(website.WebSite)
+        return str(ws.encryptedRoot()) + websharing.linkTo(self.original)[1:]
 
+    def child_rss(self, ctx):
+        return rss.Feed(self)
 
 class _BlogPostBlurbViewer(BlurbViewer):
     """

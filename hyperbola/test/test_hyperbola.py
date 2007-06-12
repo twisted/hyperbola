@@ -122,9 +122,9 @@ class BlurbTests(unittest.TestCase):
 
     def test_viewability(self):
         """
-        Verify that a blog may be viewed publicly, by retriving it through the web
-        sharing index and inspecting the result to verify that it will have
-        appropriate properties set.
+        Verify that a blog may be viewed publicly, by retrieving it
+        through the web sharing index and inspecting the result to
+        verify that it will have appropriate properties set.
         """
         er = getEveryoneRole(self.store)
         si = SharingIndex(self.store, er.externalID)
