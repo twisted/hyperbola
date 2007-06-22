@@ -8,6 +8,7 @@ objects published by Hyperbola.
 from zope.interface import implements
 
 from twisted.python.components import registerAdapter
+from twisted.web.microdom import parseString
 
 from axiom.tags import Catalog, Tag
 
@@ -388,13 +389,15 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         Replace line breaks with <br> elements
         """
         return [(tags.xml(line), tags.br) for line
-                    in self.original.body.splitlines()]
+                    in body.splitlines()]
 
     def render_body(self, ctx, data):
         """
         @return: body of our blurb
         """
-        return self._htmlifyLineBreaks(self.original.body)
+        document = parseString(self.original.body, beExtremelyLenient=True)
+        body = document.documentElement.toxml()
+        return self._htmlifyLineBreaks(body)
 
     def render_dateCreated(self, ctx, data):
         """

@@ -118,6 +118,20 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             flatten(frag._htmlifyLineBreaks(frag.original.body)),
             'foo<br />bar<br />baz<br />')
 
+
+    def test_bodyRenderer(self):
+        """
+        L{BlurbViewer.render_body} should return a well-formed XHTML document
+        fragment even if the body of the blurb being rendered is not
+        well-formed.
+        """
+        body = u'<i>hello'
+        expectedBody = u'<i>hello</i><br />'
+        view = BlurbViewer(self._makeBlurb(hyperblurb.FLAVOR.BLOG, None, body))
+        result = flatten(view.render_body(None, None))
+        self.assertEqual(result, expectedBody)
+
+
     def test_htmlBlurbBody(self):
         """
         Test that we can set and retrieve a blurb body containing HTML through
