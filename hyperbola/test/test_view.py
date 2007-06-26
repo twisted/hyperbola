@@ -7,15 +7,16 @@ from zope.interface import directlyProvides
 
 from twisted.trial.unittest import TestCase
 
-from nevow import context, tags
+from nevow import context, tags, loaders, athena, flat
 
 from axiom.store import Store
 
 from xmantissa.webtheme import getLoader
-from xmantissa import sharing
+from xmantissa import sharing, port, websharing
 from xmantissa.sharing import SharedProxy
 from xmantissa.publicweb import LoginPage
 from xmantissa.ixmantissa import IStaticShellContent
+from xmantissa.website import WebSite
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
 from hyperbola.hyperblurb import FLAVOR
@@ -33,6 +34,41 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
     """
     def setUp(self):
         self._setUpStore()
+
+
+    def test_blogsRenderer(self):
+        """
+        Test that L{hyperbola_view.BlogListFragment.blogs} renders a list of blogs.
+        """
+        ws = self.store.parent.findUnique(WebSite)
+        ws.hostname = u'blogs.renderer'
+        port.SSLPort(store=self.store.parent,
+                     portNumber=443,
+                     factory=ws)
+        blog1 = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
+        blog2 = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
+        blf = hyperbola_view.BlogListFragment(
+            athena.LivePage(), self.publicPresence)
+        blf.docFactory = loaders.stan(
+            tags.div(pattern='blog')[
+                tags.span[tags.slot('title')],
+                tags.span[tags.slot('link')],
+                tags.span[tags.slot('post-url')]])
+        tag = tags.invisible
+        markup = flat.flatten(tags.div[blf.blogs(None, tag)])
+        doc = minidom.parseString(markup)
+        blogNodes = doc.firstChild.getElementsByTagName('div')
+        self.assertEqual(len(blogNodes), 2)
+
+        for (blogNode, blog) in zip(blogNodes, (blog1, blog2)):
+            (title, blogURL, postURL) = blogNode.getElementsByTagName('span')
+            blogURL = blogURL.firstChild.nodeValue
+            expectedBlogURL = str(websharing.linkTo(blog))
+            self.assertEqual(blogURL, expectedBlogURL)
+            postURL = postURL.firstChild.nodeValue
+            self.assertEqual(
+                postURL, 'https://blogs.renderer' + expectedBlogURL + '/post')
+
 
     def test_addComment(self):
         """
@@ -205,7 +241,23 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         self.assertIdentical(result, THE_TAG)
 
 
-class BlurbViewerTests(TestCase):
+    def test_titleLink(self):
+        """
+        Verify that L{hyperbola_view.BlogPostBlurbViewer.render_titleLink}
+        links to the correct url.
+        """
+        share = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG_POST))
+        ctx = context.WebContext(tag=tags.div[tags.slot('link')])
+        frag = hyperbola_view.BlogPostBlurbViewer(share)
+        markup = flat.flatten(frag.render_titleLink(ctx, None))
+        doc = minidom.parseString(markup)
+        self.assertEqual(
+            doc.firstChild.firstChild.nodeValue,
+            str(websharing.linkTo(share).child('detail')))
+
+
+
+class BlurbViewerTests(TestCase, HyperbolaTestMixin):
     """
     Tests for L{BlurbViewer}.
     """
@@ -245,3 +297,20 @@ class BlurbViewerTests(TestCase):
         self.assertEqual(child.arguments, arguments)
         self.assertEqual(segments, postSegments[1:])
         self.assertIdentical(child.staticContent, store.parent)
+
+
+    def test_absoluteURL(self):
+        """
+        Verify that L{BlurbViewer._absoluteURL} returns something that looks
+        correct.
+        """
+        self._setUpStore()
+        ws = self.store.parent.findUnique(WebSite)
+        ws.hostname = u'absolute.url'
+        port.SSLPort(store=self.store.parent,
+                     portNumber=443,
+                     factory=ws)
+        share = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG_POST))
+        frag = BlurbViewer(share)
+        self.assertEqual(
+            frag._absoluteURL(), 'https://absolute.url' + str(websharing.linkTo(share)))

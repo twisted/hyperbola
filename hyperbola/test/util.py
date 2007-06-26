@@ -2,9 +2,9 @@ from epsilon.extime import Time
 
 from axiom.store import Store
 from axiom.dependency import installOn
-from axiom.userbase import LoginMethod
+from axiom.userbase import LoginSystem
 
-from xmantissa import sharing
+from xmantissa import sharing, website
 
 from hyperbola import hyperblurb
 from hyperbola.hyperbola_model import HyperbolaPublicPresence
@@ -19,23 +19,22 @@ class HyperbolaTestMixin:
         Set up a store, install a L{HyperbolaPublicPresence} and its
         dependencies, and create a role
         """
-        store = Store()
-        self.publicPresence = HyperbolaPublicPresence(store=store)
-        installOn(self.publicPresence, store)
-        LoginMethod(
-            store=store,
-            localpart=u'user',
-            domain=u'localhost',
-            protocol=u'*',
-            verified=False,
-            internal=True,
-            account=store)
+        store = Store(self.mktemp())
+        installOn(website.WebSite(store=store), store)
+
+        self.loginSystem = LoginSystem(store=store)
+        installOn(self.loginSystem, store)
+
+        acct = self.loginSystem.addAccount(
+            u'user', u'localhost', u'asdf', internal=True)
+        self.store = acct.avatars.open()
+        self.publicPresence = HyperbolaPublicPresence(store=self.store)
+        installOn(self.publicPresence, self.store)
 
         self.role = sharing.Role(
-            store=store,
+            store=self.store,
             externalID=u'foo@host', description=u'foo')
 
-        self.store = store
 
     def _makeBlurb(self, flavor, title=None, body=None):
         """

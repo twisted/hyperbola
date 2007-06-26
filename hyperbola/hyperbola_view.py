@@ -94,10 +94,14 @@ class BlogListFragment(webtheme.ThemedElement):
         Figure out a URL which could be used for posting to C{blog}
 
         @type blog: L{xmantissa.sharing.SharedProxy}
-        @rtype: C{unicode}
+        @rtype: L{nevow.url.URL}
         """
         ws = self.hyperbola.store.parent.findUnique(website.WebSite)
-        return str(ws.encryptedRoot()) + websharing.linkTo(blog)[1:] + '/post'
+        blogURL = websharing.linkTo(blog)
+        siteURL = ws.encryptedRoot()
+        blogURL.netloc = siteURL.netloc
+        blogURL.scheme = siteURL.scheme
+        return blogURL.child('post')
 
     def blogs(self, req, tag):
         """
@@ -464,6 +468,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         # XXX this returns 'Everyone'
         return self.original.author.externalID
+
     def _absoluteURL(self):
         """
         Return the absolute URL the websharing system makes this blurb
@@ -471,7 +476,11 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         subStore = sharing.itemFromProxy(self.original).store
         ws = subStore.parent.findUnique(website.WebSite)
-        return str(ws.encryptedRoot()) + websharing.linkTo(self.original)[1:]
+        siteURL = ws.encryptedRoot()
+        blurbURL = websharing.linkTo(self.original)
+        blurbURL.netloc = siteURL.netloc
+        blurbURL.scheme = siteURL.scheme
+        return str(blurbURL)
 
     def child_rss(self, ctx):
         return rss.Feed(self)
@@ -503,7 +512,7 @@ class _BlogPostBlurbViewer(BlurbViewer):
         """
         url = websharing.linkTo(self.original)
         return ctx.tag.fillSlots(
-            'link', url + '/detail').fillSlots(
+            'link', url.child('detail')).fillSlots(
             'title', self.original.title)
 
     def render_tags(self, ctx, data):
