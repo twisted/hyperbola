@@ -16,6 +16,7 @@ from xmantissa.sharing import Role, getShare, itemFromProxy, shareItem, NoSuchSh
 from xmantissa.sharing import getEveryoneRole, getSelfRole
 from xmantissa.publicresource import PublicAthenaLivePage
 from xmantissa.websharing import SharingIndex
+from xmantissa.website import WebSite
 
 from hyperbola import hyperbola_model, hyperblurb, ihyperbola
 
@@ -56,6 +57,7 @@ class BootstrappingTests(unittest.TestCase):
 class BlurbTests(unittest.TestCase):
     def setUp(self):
         self.store = Store()
+        self.store.parent = self.store
         self.publicPresence = hyperbola_model.HyperbolaPublicPresence(
             store=self.store)
         installOn(self.publicPresence, self.store)
