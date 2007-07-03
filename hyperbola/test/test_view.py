@@ -168,6 +168,17 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         self.assertEqual(result, expectedBody)
 
 
+    def test_bodyRendererEmptyBody(self):
+        """
+        L{BlurbViewer.render_body} should be able to render Blurbs
+        with empty bodies.
+        """
+        body = u''
+        view = BlurbViewer(self._makeBlurb(hyperblurb.FLAVOR.BLOG, None, body))
+        result = flatten(view.render_body(None, None))
+        self.assertEqual(result, body)
+
+
     def test_htmlBlurbBody(self):
         """
         Test that we can set and retrieve a blurb body containing HTML through

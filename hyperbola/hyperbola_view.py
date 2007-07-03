@@ -399,6 +399,8 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         @return: body of our blurb
         """
+        if not self.original.body:
+            return ''
         document = parseString(self.original.body, beExtremelyLenient=True)
         body = document.documentElement.toxml()
         return self._htmlifyLineBreaks(body)
