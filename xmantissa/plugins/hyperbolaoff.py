@@ -17,7 +17,7 @@ plugin = offering.Offering(
     name = u"Hyperbola",
 
     description = u"""
-    This is the wonderful Hyperbola application. Click me to install.
+    A basic weblog system.
     """,
 
     siteRequirements = (
@@ -27,7 +27,7 @@ plugin = offering.Offering(
     appPowerups = (HyperbolaPublicPage,),
     installablePowerups = [(
         u'Publisher',
-        u'An object which can publish all the latest thoughts and ideas from Ray.',
+        u'Allows publishing of posts in a weblog format.',
         hyperbola_model.HyperbolaPublicPresence)],
     loginInterfaces = (),
     themes = (HyperbolaTheme('base', 0),)
