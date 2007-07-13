@@ -1,6 +1,48 @@
 // import Nevow.Athena
 // import Mantissa.LiveForm
 // import Mantissa.AutoComplete
+// import Mantissa.ScrollTable
+
+Hyperbola.ScrollTable = Mantissa.ScrollTable.ScrollTable.subclass('Hyperbola.ScrollTable');
+/**
+ * L{Mantissa.ScrollTable.ScrollTable} subclass for rendering lists of blurbs.
+ */
+Hyperbola.ScrollTable.methods(
+    /**
+     * Overide the default implementation to skip the timestamp column.
+     */
+    function skipColumn(self, name) {
+        if(name == "dateCreated") {
+            return true;
+        }
+        return false;
+    },
+
+    /**
+     * Trying to actually determine a sensible pagesize is pointless here,
+     * because post heights vary wildly.  This is as reasonable a guess as the
+     * framework is likely to make, but doesn't fall into the trap of being
+     * pathologically small if a really big post happens to get involved in
+     * estimation.
+     */
+    function _detectPageSize(self) {
+        self.model._pagesize = 10;
+    },
+
+    /**
+     * Override the default implementation to avoid wrapping the cell in a
+     * link tag.
+     */
+    function makeCellElement(self, colName, rowData) {
+        var columnObject = self.columns[colName];
+        var columnValue = columnObject.extractValue(rowData);
+        return MochiKit.DOM.DIV(
+            {"class": "scroll-cell",
+                    // Blog posts _need_ to wrap, but scroll rows in
+                    // scrolltables are told not to; let's make it explicit.
+                    "style": "white-space: normal"},
+            columnObject.valueToDOM(columnValue, self));
+    });
 
 Hyperbola._ReloadingFormWidget = Mantissa.LiveForm.FormWidget.subclass('Hyperbola._ReloadingFormWidget');
 Hyperbola._ReloadingFormWidget.methods(

@@ -2,6 +2,14 @@
     font-weight: bold;
 }
 
+.hyperbola-blog .scroll-row:hover .scroll-cell {
+    background-color: #FFFFFF;
+}
+
+.hyperbola-blog .scroll-cell {
+    border-width: 0px;
+}
+
 .hyperbola-section-heading {
     color: #444444;
     font-weight: bold;

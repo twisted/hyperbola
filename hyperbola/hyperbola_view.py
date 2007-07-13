@@ -1,4 +1,4 @@
-# -*- test-case-name: hyperbola.test -*-
+# -*- test-case-name: hyperbola.test.test_view -*-
 
 """
 This module contains web-based views onto L{hyperbola.hyperblurb.Blurb}
@@ -10,19 +10,200 @@ from zope.interface import implements
 from twisted.python.components import registerAdapter
 from twisted.web.microdom import parseString
 
+from epsilon.extime import Time
+
 from axiom.tags import Catalog, Tag
 
-from nevow import athena, inevow, page, tags, rend, loaders
-from nevow.url import URL
+from nevow import athena, inevow, page, tags, rend
 from nevow.flat import flatten
 
-from epsilon.extime import Time
-from xmantissa import ixmantissa, webtheme, websharing, website, webapp, publicresource
+from xmantissa import ixmantissa, webtheme, websharing, website, publicresource
 from xmantissa.publicweb import LoginPage
 from xmantissa import sharing, liveform
+from xmantissa.scrolltable import ScrollingElement, TYPE_WIDGET
 
 from hyperbola.hyperblurb import FLAVOR, Blurb
 from hyperbola import ihyperbola, rss
+
+
+def _docFactorify(publicViewElement):
+    """
+    Normally in the course of rendering one of these widgets, the theming
+    system (in the guise of xmantissa.websharing.SharingIndex) will assign the
+    docFactory attribute to the public INavigableFragment (athena element or
+    fragment) of choice.
+
+    There's currently a huge mess of dependencies worming their way through
+    websharing, publicweb, hyperbola, and others, which prevents the correct
+    solution, which is to use a ThemedElement or themed doc factory from
+    webtheme as a basis for all of the themable public views.  This should
+    eventually be fixed, and then more general testing fixtures can be used.
+    For the moment this function tries to provide a temporary simulacrum of
+    correctness; calls to it should be taken to mean "just adjust this fragment
+    or element so that it has a usable docFactory for the moment, and fix this
+    code later to invoke something that actually honors the store".
+
+    @param publicViewElement: a L{athena.LiveFragment} or an
+    L{athena.LiveElement} with a 'fragmentName' attribute, intended to be used
+    with the Mantissa theming system.
+    """
+    publicViewElement.docFactory = webtheme.getLoader(
+        publicViewElement.fragmentName)
+
+
+class _BlurbTimestampColumn(object):
+    """
+    A timestamp column provider specific to the blurb viewing interface.
+    """
+    implements(ixmantissa.IColumn)
+
+    attributeID = 'dateCreated'
+
+    def getType(self):
+        """
+        Return 'timestamp', since this is a timestamp column.
+        """
+        return 'timestamp'
+
+
+    def extractValue(self, model, viewable):
+        """
+        Extract the creation date from an IViewable provider.
+        """
+        return viewable.dateCreated.asPOSIXTimestamp()
+
+
+    def sortAttribute(self):
+        """
+        Return the 'dateCreated' column from Blurb as the sort key for this
+        column.
+        """
+        return Blurb.dateCreated
+
+
+    def toComparableValue(self, value):
+        """
+        Convert a float from the client back into a timestamp.
+        """
+        return Time.fromPOSIXTimestamp(value)
+
+
+
+class BlurbViewColumn(object):
+    """
+    L{ixmantissa.IColumn} which returns the approriate view for the blurb item.
+    """
+    implements(ixmantissa.IColumn)
+    attributeID = 'blurbView'
+
+    def sortAttribute(self):
+        """
+        BlurbViewColumns cannot be sorted.
+        """
+        return None
+
+
+    def extractValue(self, model, share):
+        """
+        Use L{blurbViewDispatcher} to find the right view for the blurb share
+        C{share}.
+
+        @type model: L{ShareScrollingElement}
+
+        @param share: a SharedProxy providing at least L{IViewable}.
+        @type share: L{sharing.SharedProxy}
+
+        @return: a blurb view.
+        @rtype: L{BlurbViewer} subclass
+        """
+        fragment = blurbViewDispatcher(share)
+        fragment.setFragmentParent(model)
+        _docFactorify(fragment)
+        return fragment
+
+
+    def getType(self):
+        """
+        Return L{TYPE_WIDGET}
+        """
+        return TYPE_WIDGET
+
+
+    def toComparableValue(self, value):
+        """
+        We are not sortable, so explode if anyone tries to do this.
+        """
+        raise NotImplementedError()
+
+
+
+class ShareScrollingElement(ScrollingElement):
+    """
+    A L{ShareScrollingElement} is a L{ScrollingElement} subclass which wraps its
+    query in an L{asAccessibleTo} call to restrict access to the items it is
+    browsing.
+
+    @ivar role: The role of the user that is viewing this scrolltable.
+    @type role: L{xmantissa.sharing.Role}
+
+    NB: For compatibility with L{ScrollingElement}, all sharing proxies are
+    unwrapped before being passed to axiom columns.  This has the security
+    implication that any attributes passed to this class's constructor are
+    considered public for the purposes of this scrolltable, even if other
+    interfaces would have hidden them.
+    """
+    jsClass = u'Hyperbola.ScrollTable'
+
+    def __init__(self, role, *a, **k):
+        """
+        Create a L{ShareScrollingElement}.  Take all the same arguments as a
+        L{ScrollingElement}, in addition to a L{Role} object that this
+        scrolling view will be restricted to.
+        """
+        self.role = role
+        ScrollingElement.__init__(self, *a, **k)
+
+
+    def linkToItem(self, proxy):
+        """
+        This table's query results are proxies rather than items, so unwrap
+        them to generate unique IDs.
+
+        @param proxy: a shared proxy.
+        @type proxy: L{xmantissa.sharing.SharedProxy}
+
+        @return: the web ID of the item that C{proxy} is wrapping.
+        @rtype: C{str}
+        """
+        return super(ShareScrollingElement, self).linkToItem(
+            sharing.itemFromProxy(proxy))
+
+
+    def inequalityQuery(self, constraint, count, isAscending):
+        """
+        Perform the query in L{ScrollingElement} in a slightly different way: wrap
+        it in L{asAccessibleTo} for this L{ShareScrollingElement}'s role.
+
+        @param constraint: an additional constraint to apply to the
+        query.
+        @type constraint: L{axiom.iaxiom.IComparison}.
+
+        @param count: the maximum number of rows to return.
+        @type count: C{int}
+
+        @param isAscending: a boolean describing whether the query
+        should be yielding ascending or descending results.
+        @type isAscending: C{bool}
+
+        @return: an query which will yield some results from this
+        model.
+        @rtype: L{axiom.iaxiom.IQuery}
+        """
+        theQuery = super(ShareScrollingElement, self).inequalityQuery(
+            constraint, count, isAscending)
+        return sharing.asAccessibleTo(self.role, theQuery.query)
+
+
 
 class HyperbolaView(athena.LiveFragment):
     """
@@ -145,7 +326,7 @@ class BlogAddingFragment(liveform.LiveForm):
                 "A Blog that I write")])
         self.setFragmentParent(page)
         self.hyperbola = hyperbola
-        self.docFactory = webtheme.getLoader(self.fragmentName)
+        _docFactorify(self)
 
 
 
@@ -168,12 +349,12 @@ def parseTags(tagString):
     @type tagString: C{unicode}
     @rtype: C{list} of C{unicode}
     """
-    tags = list()
+    tagList = []
     for tag in tagString.split(','):
         tag = tag.strip()
         if tag:
-            tags.append(tag)
-    return tags
+            tagList.append(tag)
+    return tagList
 
 
 
@@ -206,7 +387,7 @@ class AddCommentFragment(liveform.LiveForm):
                 liveform.TEXT_INPUT,
                 parseTags)))
 
-        self.docFactory = webtheme.getLoader(self.fragmentName)
+        _docFactorify(self)
 
 
     def addComment(self, title, body, tags):
@@ -361,13 +542,13 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         Retrieve the role currently viewing this blurb viewer.
         """
-        item = sharing.itemFromProxy(self.original)
+        store = sharing.itemFromProxy(self.original).store
         if self.customizedFor is None:
             # If this hasn't been customized, it's public.
-            return sharing.getEveryoneRole(item.store)
+            return sharing.getEveryoneRole(store)
         else:
             # Otherwise, get the primary role of the current observer.
-            return sharing.getPrimaryRole(item.store, self.customizedFor)
+            return sharing.getPrimaryRole(store, self.customizedFor)
 
     def child_post(self, ctx):
         """
@@ -439,7 +620,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         for blurb in blurbs:
             f = blurbViewDispatcher(blurb)
             f.setFragmentParent(self)
-            f.docFactory = webtheme.getLoader(f.fragmentName)
+            _docFactorify(f)
             yield f
 
     def render_view(self, ctx, data):
@@ -448,7 +629,18 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         """
         blurbs = self._getChildBlurbs(ctx)
         if 0 < len(blurbs):
-            return self._getChildBlurbViews(blurbs)
+            blurbItem = sharing.itemFromProxy(self.original)
+            fragment = ShareScrollingElement(
+                self.getRole(),
+                blurbItem.store,
+                Blurb,
+                Blurb.parent == blurbItem,
+                [_BlurbTimestampColumn(), BlurbViewColumn()],
+                Blurb.dateCreated, False,
+                ixmantissa.IWebTranslator(blurbItem.store))
+            _docFactorify(fragment)
+            fragment.setFragmentParent(self)
+            return fragment
         else:
             p = inevow.IQ(self.docFactory).onePattern('no-child-blurbs')
             return [p.fillSlots('child-type-name', self._childTypeName)]
@@ -461,7 +653,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
             return ''
         f = addCommentDispatcher(self)
         f.setFragmentParent(self)
-        f.docFactory = webtheme.getLoader(f.fragmentName)
+        _docFactorify(f)
         return f
 
     def render_author(self, ctx, data):
@@ -540,7 +732,7 @@ class _BlogPostBlurbViewer(BlurbViewer):
     def render_editor(self, ctx, data):
         f = editBlurbDispatcher(self.original)
         f.setFragmentParent(self)
-        f.docFactory = webtheme.getLoader(f.fragmentName)
+        _docFactorify(f)
         return f
 
     def render_editLink(self, ctx, data):
@@ -573,7 +765,7 @@ class BlogPostBlurbViewer(_BlogPostBlurbViewer):
         """
         f = blurbViewDetailDispatcher(self.original)
         f.customizeFor(self.customizedFor)
-        f.docFactory = webtheme.getLoader(f.fragmentName)
+        _docFactorify(f)
 
         return publicresource.PublicAthenaLivePage(
             sharing.itemFromProxy(self.original).store.parent,

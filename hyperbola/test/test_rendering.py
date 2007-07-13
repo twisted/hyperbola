@@ -9,8 +9,7 @@ from twisted.internet import defer
 
 from epsilon.extime import Time
 
-from axiom.dependency import installOn
-from xmantissa import ixmantissa, webtheme, sharing, website, port
+from xmantissa import ixmantissa, webtheme
 
 from nevow.testutil import renderLivePage, FragmentWrapper, AccumulatingFakeRequest, renderPage
 

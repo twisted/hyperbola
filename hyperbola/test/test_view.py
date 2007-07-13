@@ -1,3 +1,4 @@
+# -*- test-case-name: hyperbola.test.test_view.ViewTestCase.test_scrollViewRenderer -*-
 """
 Tests for Hyperbola view logic
 """
@@ -7,15 +8,18 @@ from zope.interface import directlyProvides
 
 from twisted.trial.unittest import TestCase
 
-from nevow import context, tags, loaders, athena, flat
+from epsilon.extime import Time
 
 from axiom.store import Store
 
-from xmantissa.webtheme import getLoader
-from xmantissa import sharing, port, websharing
+from nevow import context, tags, loaders, athena, flat, inevow
+from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
+from nevow.flat import flatten
+
+from xmantissa import sharing, port, websharing, scrolltable
 from xmantissa.sharing import SharedProxy
 from xmantissa.publicweb import LoginPage
-from xmantissa.ixmantissa import IStaticShellContent
+from xmantissa.ixmantissa import IStaticShellContent, IWebTranslator
 from xmantissa.website import WebSite
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
@@ -24,9 +28,134 @@ from hyperbola.hyperbola_view import BlurbViewer
 from hyperbola.ihyperbola import IViewable
 from hyperbola.test.util import HyperbolaTestMixin
 
-from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
-from nevow import loaders, tags
-from nevow.flat import flatten
+
+
+class ScrollerTestCase(TestCase, HyperbolaTestMixin):
+    """
+    Tests for L{hyperbola_view.ShareScrollingElement} and related
+    functionality.
+    """
+    def setUp(self):
+        """
+        Set up an environment suitable for testing the share-handling
+        functionality of L{hyperbola_view.ShareScrollingElement}.
+        """
+        self._setUpStore()
+
+        blogShare = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
+        EVERYBODY = sharing.getEveryoneRole(self.store)
+        sharing.itemFromProxy(blogShare).permitChildren(
+            EVERYBODY, FLAVOR.BLOG_POST, ihyperbola.IViewable)
+
+        # For sanity's sake, let's not have the role of the view and the role
+        # implicitly chosen by not calling 'customizeFor' disagree.  (This
+        # shouldn't be possible anyway, and in the future getRole should just
+        # be looking at its proxy.)
+        self.publicBlogShare = sharing.getShare(
+            self.store, EVERYBODY, blogShare.shareID)
+        selfRole = sharing.getSelfRole(self.store)
+        blogPostShareID = blogShare.post(u'', u'', selfRole)
+        self.blogPostSharedToEveryone = sharing.getShare(
+            self.store, EVERYBODY, blogPostShareID)
+        self.blogPostItem = sharing.itemFromProxy(self.blogPostSharedToEveryone)
+
+
+    def _getRenderViewScroller(self):
+        """
+        Get a L{hyperbola_view.ShareScrollingElement} by way of
+        L{hyperbola_view.BlogBlurbViewer.render_view}.
+        """
+        fragment = hyperbola_view.BlogBlurbViewer(self.publicBlogShare)
+        hyperbola_view._docFactorify(fragment)
+        ctx = context.WebContext(tag=tags.invisible())
+        ctx.remember(FakeRequest(), inevow.IRequest)
+        return fragment.render_view(ctx, None)
+
+
+    def test_scrollViewRenderer(self):
+        """
+        Verify that L{hyperbola_view.BlogBlurbViewer.render_view} returns a
+        L{hyperbola.hyperbola_view.ShareScrollTable} when posts are available.
+        """
+        scroller = self._getRenderViewScroller()
+        self.failUnless(isinstance(scroller,
+                                   hyperbola_view.ShareScrollingElement))
+
+
+    def test_renderedScrollerInitializedCorrectly(self):
+        """
+        L{hyperbola_view.BlogBlurbViewer.render_view} should return a
+        L{hyperbola.hyperbola_view.ShareScrollTable} that is aware of
+        all of the posts that have been made to the blog.
+        """
+        scroller = self._getRenderViewScroller()
+        rows = scroller.rowsAfterValue(None, 10)
+        self.assertEqual(len(rows), 1)
+        theRow = rows[0]
+        self.assertEqual(
+            theRow['dateCreated'],
+            self.blogPostItem.dateCreated.asPOSIXTimestamp())
+        self.assertEqual(
+            theRow['__id__'],
+            IWebTranslator(self.store).toWebID(self.blogPostItem))
+        blogPostFragment = theRow['blurbView']
+        # the scrolltable fragment is not customized, so we want to
+        # ensure that the proxy passed to the IColumns is the facet
+        # shared to Everyone
+        self.assertEqual(
+            list(blogPostFragment.original.sharedInterfaces),
+            list(self.blogPostSharedToEveryone.sharedInterfaces))
+        self.assertIdentical(
+            sharing.itemFromProxy(blogPostFragment.original),
+            self.blogPostItem)
+
+
+    def test_renderedScrollerRenderable(self):
+        """
+        L{hyperbola_view.BlogBlurbViewer.render_view} should return a
+        L{hyperba.hyperbola_view.ShareScrollTable} that is renderable
+        - i.e. has a docFactory and is not an orphan.
+        """
+        scroller = self._getRenderViewScroller()
+        self.failUnless(scroller.fragmentParent is not None)
+        return renderLivePage(FragmentWrapper(scroller))
+
+
+    def test_blurbTimestampColumn(self):
+        """
+        Verify the L{xmantissa.ixmantissa.IColumn} implementation of
+        L{hyperbola_view._BlurbTimestampColumn}.
+        """
+        col = hyperbola_view._BlurbTimestampColumn()
+        self.assertEqual(col.attributeID, 'dateCreated')
+        self.assertEqual(col.getType(), 'timestamp')
+        self.blogPostItem.dateCreated = Time.fromPOSIXTimestamp(345)
+        value = col.extractValue(None, self.blogPostItem)
+        self.assertEqual(value, 345)
+        self.assertIdentical(col.sortAttribute(), hyperblurb.Blurb.dateCreated)
+        comparable = col.toComparableValue(345)
+        self.assertEqual(comparable, self.blogPostItem.dateCreated)
+
+
+    def test_blurbViewColumn(self):
+        """
+        Verify the L{xmantissa.ixmantissa.IColumn} implementation of
+        L{hyperbola_view.BlurbViewColumn}.
+        """
+        col = hyperbola_view.BlurbViewColumn()
+        self.assertEqual(col.attributeID, 'blurbView')
+        self.assertEqual(col.getType(), scrolltable.TYPE_WIDGET)
+        model = athena.LivePage()
+        frag = col.extractValue(model, self.blogPostSharedToEveryone)
+        fragClass = hyperbola_view.blurbViewDispatcher(
+            self.blogPostSharedToEveryone).__class__
+        self.failUnless(isinstance(frag, fragClass))
+        self.assertIdentical(frag.fragmentParent, model)
+        self.failUnless(frag.docFactory)
+        self.assertIdentical(col.sortAttribute(), None)
+        self.assertRaises(NotImplementedError, col.toComparableValue, None)
+
+
 
 class ViewTestCase(TestCase, HyperbolaTestMixin):
     """
@@ -34,6 +163,27 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
     """
     def setUp(self):
         self._setUpStore()
+
+
+    def test_blogView(self):
+        """
+        L{hyperbola_view.BlogBlurbViewer.render_view} should render a
+        pattern indicating that there are no blog posts, if it has no
+        children.
+        """
+        blogShare = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
+        fragment = hyperbola_view.BlogBlurbViewer(blogShare)
+        fragment.docFactory = loaders.stan(
+            tags.div(pattern='no-child-blurbs', foo='bar')[
+            tags.slot(name='child-type-name')])
+        ctx = context.WebContext(tag=tags.invisible)
+        ctx.remember(FakeRequest(), inevow.IRequest)
+        result = fragment.render_view(ctx, None)
+        markup = flat.flatten(result)
+        doc = minidom.parseString(markup)
+        self.assertEqual(doc.firstChild.getAttribute('foo'), 'bar')
+        self.assertEqual(
+            doc.firstChild.firstChild.nodeValue, fragment._childTypeName)
 
 
     def test_blogsRenderer(self):
