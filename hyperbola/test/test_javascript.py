@@ -17,3 +17,10 @@ class HyperbolaJavaScriptTestCase(JavaScriptTestCase):
         Test the blurb-listing scrolltable.
         """
         return 'Hyperbola.ConsoleTest.TestScrollTable'
+
+
+    def test_blogPostBlurbController(self):
+        """
+        Test the blog post blurb controller!
+        """
+        return 'Hyperbola.Test.TestBlogPostBlurb'

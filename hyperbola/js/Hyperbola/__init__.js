@@ -2,6 +2,9 @@
 // import Mantissa.LiveForm
 // import Mantissa.AutoComplete
 // import Mantissa.ScrollTable
+// import Mantissa.DOMReplace
+
+
 
 Hyperbola.ScrollTable = Mantissa.ScrollTable.ScrollTable.subclass('Hyperbola.ScrollTable');
 /**
@@ -64,7 +67,24 @@ Hyperbola.AddBlog = Hyperbola._ReloadingFormWidget.subclass('Hyperbola.AddBlog')
 Hyperbola.AddComment = Hyperbola._ReloadingFormWidget.subclass('Hyperbola.AddComment');
 
 Hyperbola.BlogPostBlurbController = Nevow.Athena.Widget.subclass('Hyperbola.BlogPostBlurbController');
+/**
+ * Controller class for blurbs of the BLOG_POST flavor.
+ */
 Hyperbola.BlogPostBlurbController.methods(
+    function __init__(self, node) {
+        Hyperbola.BlogPostBlurbController.upcall(self, '__init__', node);
+        self._highlightURLs();
+    },
+
+    /**
+     * Highlight any URLs that appear in the body of this blog post.
+     */
+    function _highlightURLs(self) {
+        var bodyContainerNode = self.firstNodeByAttribute(
+            'class', 'hyperbola-blurb-body');
+        Mantissa.DOMReplace.urlsToLinks(bodyContainerNode);
+    },
+
     function togglePostComments(self) {
         var node = self.firstNodeByAttribute(
             'class', 'hyperbola-blog-post-comments');
