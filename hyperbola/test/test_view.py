@@ -9,8 +9,12 @@ from zope.interface import directlyProvides
 from twisted.trial.unittest import TestCase
 
 from epsilon.extime import Time
+from epsilon.scripts import certcreate
 
+from axiom import userbase
 from axiom.store import Store
+from axiom.dependency import installOn
+from axiom.test.util import getPristineStore
 
 from nevow import context, tags, loaders, athena, flat, inevow
 from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
@@ -21,12 +25,34 @@ from xmantissa.sharing import SharedProxy
 from xmantissa.publicweb import LoginPage
 from xmantissa.ixmantissa import IStaticShellContent, IWebTranslator
 from xmantissa.website import WebSite
+from xmantissa.offering import installOffering
+from xmantissa.plugins.baseoff import baseOffering
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
 from hyperbola.hyperblurb import FLAVOR
 from hyperbola.hyperbola_view import BlurbViewer
 from hyperbola.ihyperbola import IViewable
 from hyperbola.test.util import HyperbolaTestMixin
+
+
+
+def createStore(testCase):
+    """
+    Create a new Store in a temporary directory retrieved from C{testCase}.
+    Give it a LoginSystem and create an SSL certificate in its files directory.
+ 
+    @param testCase: The L{unittest.TestCase} by which the returned Store will
+    be used.
+ 
+    @rtype: L{Store}
+    """
+    dbdir = testCase.mktemp()
+    store = Store(dbdir)
+    login = userbase.LoginSystem(store=store)
+    installOn(login, store)
+    certPath = store.newFilePath('server.pem')
+    certcreate.main(['--filename', certPath.path, '--quiet'])
+    return store
 
 
 
@@ -422,6 +448,14 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
     """
     Tests for L{BlurbViewer}.
     """
+    def setUp(self):
+        self.store = getPristineStore(self, createStore)
+        installOffering(self.store, baseOffering, {})
+        self.store.parent = getPristineStore(self, createStore)
+        directlyProvides(self.store.parent, IStaticShellContent)
+        installOffering(self.store.parent, baseOffering, {})
+        
+
     def test_postWithoutPrivileges(self):
         """
         Attempting to post to a blog should result in a L{LoginPage} which
@@ -435,21 +469,13 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
                 self.store = store
                 self.flavor = flavor
 
-        store = Store()
-
-        # XXX IStaticShellContent needs to go.
-        class ParentStore(object):
-            pass
-        store.parent = ParentStore()
-        directlyProvides(store.parent, IStaticShellContent)
-
         currentSegments = ['foo', 'bar']
         postSegments = ['post', 'baz']
         arguments = {'quux': ['1', '2']}
         request = FakeRequest(
             uri='/'.join([''] + currentSegments + postSegments),
             currentSegments=currentSegments, args=arguments)
-        blurb = StubBlurb(store, FLAVOR.BLOG)
+        blurb = StubBlurb(self.store, FLAVOR.BLOG)
         sharedBlurb = SharedProxy(blurb, (IViewable,), 'abc')
         view = BlurbViewer(sharedBlurb)
         child, segments = view.locateChild(request, postSegments)
@@ -457,7 +483,7 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
         self.assertEqual(child.segments, currentSegments + postSegments[:1])
         self.assertEqual(child.arguments, arguments)
         self.assertEqual(segments, postSegments[1:])
-        self.assertIdentical(child.staticContent, store.parent)
+        self.assertIdentical(child.staticContent, self.store.parent)
 
 
     def test_absoluteURL(self):
