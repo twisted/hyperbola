@@ -5,17 +5,11 @@ This module contains a Mantissa web theme plugin which includes Hyperbola's
 style information.
 """
 
-from xmantissa import webtheme
-from nevow import tags
+from xmantissa.webtheme import XHTMLDirectoryTheme
 
-class HyperbolaTheme(webtheme.XHTMLDirectoryTheme):
+
+class HyperbolaTheme(XHTMLDirectoryTheme):
     """
     Hyperbola's style information, which resides in the 'static' directory.
     """
-    def head(self, req, website):
-        root = website.cleartextRoot(req.getHeader('host'))
-        static = root.child('Hyperbola').child('static')
-        yield tags.link(
-            href=static.child('hyperbola.css'),
-            rel='stylesheet',
-            type='text/css')
+    stylesheetLocation = ['static', 'Hyperbola', 'hyperbola.css']
