@@ -5,18 +5,19 @@ viewing logic in Hyperbola.
 
 from axiom.store import Store
 
+from twisted.python.reflect import qual
 from twisted.trial import unittest
 
 from epsilon.extime import Time
 
-from axiom.dependency import installOn
-from axiom.userbase import LoginMethod
+from axiom.userbase import LoginSystem, LoginMethod
+from axiom.plugins.mantissacmd import Mantissa
 
+from xmantissa.product import Product
 from xmantissa.sharing import Role, getShare, itemFromProxy, shareItem, NoSuchShare
 from xmantissa.sharing import getEveryoneRole, getSelfRole
 from xmantissa.publicresource import PublicAthenaLivePage
 from xmantissa.websharing import SharingIndex
-from xmantissa.website import WebSite
 
 from hyperbola import hyperbola_model, hyperblurb, ihyperbola
 
@@ -56,19 +57,28 @@ class BootstrappingTests(unittest.TestCase):
 
 class BlurbTests(unittest.TestCase):
     def setUp(self):
-        self.store = Store()
-        self.store.parent = self.store
-        self.publicPresence = hyperbola_model.HyperbolaPublicPresence(
-            store=self.store)
-        installOn(self.publicPresence, self.store)
+        self.siteStore = Store(filesdir=self.mktemp())
+        Mantissa().installSite(self.siteStore, u'example.com', u"", False)
+        self.loginSystem = self.siteStore.findUnique(LoginSystem)
 
-        self.me = Role(store=self.store,
+        userAccount = self.loginSystem.addAccount(
+            u'alice', u'example.com', u'password')
+        self.userStore = userAccount.avatars.open()
+
+        product = Product(
+            store=self.siteStore,
+            types=[qual(hyperbola_model.HyperbolaPublicPresence)])
+        product.installProductOn(self.userStore)
+        self.publicPresence = self.userStore.findUnique(
+            hyperbola_model.HyperbolaPublicPresence)
+
+        self.me = Role(store=self.userStore,
                        externalID=u'armstrong@example.com', description=u'foobar')
-        self.you = Role(store=self.store,
+        self.you = Role(store=self.userStore,
                         externalID=u'radix@example.com', description=u'rad yo')
 
         blog = self.blog = hyperblurb.Blurb(
-            store=self.store, title=u"Hello World",
+            store=self.userStore, title=u"Hello World",
             body=u"Hello World!~!!", author=self.me, hits=0,
             dateCreated=Time(), dateLastEdited=Time(),
             flavor=hyperblurb.FLAVOR.BLOG)
@@ -81,7 +91,7 @@ class BlurbTests(unittest.TestCase):
             self.you, hyperblurb.FLAVOR.BLOG_POST, ihyperbola.ICommentable)
         blog.permitChildren(
             self.you, hyperblurb.FLAVOR.BLOG_COMMENT, ihyperbola.ICommentable)
-        shareItem(blog, getEveryoneRole(self.store), shareID=u'blog',
+        shareItem(blog, getEveryoneRole(self.userStore), shareID=u'blog',
                   interfaces=[ihyperbola.IViewable])
 
 
@@ -92,11 +102,11 @@ class BlurbTests(unittest.TestCase):
         """
         postShareID = self.blog.post(u'My First Post', u'Hello, Viewers', self.me)
         self.assertNotIdentical(postShareID, None)
-        sharedPost = getShare(self.store, self.you, postShareID)
+        sharedPost = getShare(self.userStore, self.you, postShareID)
         commentShareID = sharedPost.post(u'My Comemnt To Your Post',
                                          u'Your Bolg Sucks, man', self.you)
         self.assertNotIdentical(commentShareID, None)
-        sharedComment = getShare(self.store, self.you, commentShareID)
+        sharedComment = getShare(self.userStore, self.you, commentShareID)
         self.assertIdentical(sharedComment.parent, itemFromProxy(sharedPost))
         self.assertRaises(AttributeError,
                           lambda: sharedPost.edit(
@@ -114,7 +124,7 @@ class BlurbTests(unittest.TestCase):
         blurb
         """
         postShareID = self.blog.post(u'', u'', self.me)
-        sharedPost = getShare(self.store, self.me, postShareID)
+        sharedPost = getShare(self.userStore, self.me, postShareID)
         sharedPost.tag(u'foo')
         sharedPost.tag(u'bar')
         self.assertEquals(set(sharedPost.tags()), set(('foo', 'bar')))
@@ -128,8 +138,8 @@ class BlurbTests(unittest.TestCase):
         through the web sharing index and inspecting the result to
         verify that it will have appropriate properties set.
         """
-        er = getEveryoneRole(self.store)
-        si = SharingIndex(self.store, er.externalID)
+        er = getEveryoneRole(self.userStore)
+        si = SharingIndex(self.userStore, er.externalID)
         child, segs = si.locateChild(None, ['blog'])
         self.assertEquals(len(segs), 0)
         self.failUnless(isinstance(child, PublicAthenaLivePage))
@@ -162,9 +172,9 @@ class BlurbTests(unittest.TestCase):
         """
         shareID1 = self.blog.post(
             u'My First Post', u'Hello, Viewers', self.me)
-        post = getShare(self.store, self.you, shareID1)
+        post = getShare(self.userStore, self.you, shareID1)
         shareID2 = post.post(u'a comment', u'O RLY?', self.you)
-        post2 = getShare(self.store, self.me, shareID2)
+        post2 = getShare(self.userStore, self.me, shareID2)
         shareID3 = post2.post(u'another comment', u'YA RLY!', self.me)
 
         posts = list(post.view(self.you))
@@ -176,7 +186,7 @@ class BlurbTests(unittest.TestCase):
         Test that blurb tagging works
         """
         shareID = self.blog.post(u'', u'', self.me)
-        post = getShare(self.store, self.me, shareID)
+        post = getShare(self.userStore, self.me, shareID)
         post.tag(u'foo')
         post.tag(u'bar')
         self.assertEquals(list(post.tags()), ['foo', 'bar'])
@@ -187,7 +197,7 @@ class BlurbTests(unittest.TestCase):
         when there are no tags
         """
         shareID = self.blog.post(u'', u'', self.me)
-        post = getShare(self.store, self.me, shareID)
+        post = getShare(self.userStore, self.me, shareID)
         self.assertEquals(list(post.tags()), [])
 
     def test_viewByTag(self):
@@ -196,11 +206,11 @@ class BlurbTests(unittest.TestCase):
         children with the given tag
         """
         post1 = getShare(
-            self.store, self.me, self.blog.post(u'', u'', self.me))
+            self.userStore, self.me, self.blog.post(u'', u'', self.me))
         post2 = getShare(
-            self.store, self.me, self.blog.post(u'', u'', self.me))
+            self.userStore, self.me, self.blog.post(u'', u'', self.me))
         post3 = getShare(
-            self.store, self.me, self.blog.post(u'', u'', self.me))
+            self.userStore, self.me, self.blog.post(u'', u'', self.me))
 
         post1.tag(u'foo')
         post1.tag(u'bar')
@@ -217,7 +227,7 @@ class BlurbTests(unittest.TestCase):
         """
         self.blog.post(u'', u'', self.me)
         self.blog.delete()
-        self.assertEquals(self.store.count(hyperblurb.Blurb), 0)
+        self.assertEquals(self.userStore.query(hyperblurb.Blurb).count(), 0)
 
     def test_shareToAuthorOnly(self):
         """
@@ -227,10 +237,10 @@ class BlurbTests(unittest.TestCase):
         """
         shareID = self.blog.post(
             u'', u'', self.me, {self.me: [ihyperbola.IViewable]})
-        self.failUnless(getShare(self.store, self.me, shareID))
+        self.failUnless(getShare(self.userStore, self.me, shareID))
         self.assertRaises(
             NoSuchShare,
-            lambda: getShare(self.store, self.you, shareID))
+            lambda: getShare(self.userStore, self.you, shareID))
 
     def test_editPermsAuthorOnly(self):
         """
@@ -239,16 +249,15 @@ class BlurbTests(unittest.TestCase):
         a share that can't be accessed by anybody else
         """
         shareID = self.blog.post(u'', u'', self.me)
-        share = getShare(self.store, self.me, shareID)
+        share = getShare(self.userStore, self.me, shareID)
         shareID = itemFromProxy(share).editPermissions(
             {self.me: [ihyperbola.IViewable]})
-        share = getShare(self.store, self.me, shareID)
+        share = getShare(self.userStore, self.me, shareID)
         self.assertRaises(
             NoSuchShare,
-            lambda: getShare(self.store, self.you, shareID))
+            lambda: getShare(self.userStore, self.you, shareID))
 
-    def tearDown(self):
-        self.store.close()
+
 
 class BlurbSourceTestCase(unittest.TestCase):
     """

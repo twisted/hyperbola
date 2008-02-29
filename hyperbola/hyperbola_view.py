@@ -17,7 +17,7 @@ from axiom.tags import Catalog, Tag
 from nevow import athena, inevow, page, tags, rend
 from nevow.flat import flatten
 
-from xmantissa import ixmantissa, webtheme, websharing, website, publicresource
+from xmantissa import ixmantissa, webtheme, websharing, publicresource
 from xmantissa.publicweb import LoginPage
 from xmantissa import sharing, liveform
 from xmantissa.scrolltable import ScrollingElement, TYPE_WIDGET
@@ -277,9 +277,9 @@ class BlogListFragment(webtheme.ThemedElement):
         @type blog: L{xmantissa.sharing.SharedProxy}
         @rtype: L{nevow.url.URL}
         """
-        ws = self.hyperbola.store.parent.findUnique(website.WebSite)
+        site = ixmantissa.ISiteURLGenerator(self.hyperbola.store.parent)
         blogURL = websharing.linkTo(blog)
-        siteURL = ws.encryptedRoot()
+        siteURL = site.encryptedRoot()
         blogURL.netloc = siteURL.netloc
         blogURL.scheme = siteURL.scheme
         return blogURL.child('post')
@@ -669,8 +669,8 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         available at.
         """
         subStore = sharing.itemFromProxy(self.original).store
-        ws = subStore.parent.findUnique(website.WebSite)
-        siteURL = ws.encryptedRoot()
+        site = ixmantissa.ISiteURLGenerator(subStore.parent)
+        siteURL = site.encryptedRoot()
         blurbURL = websharing.linkTo(self.original)
         blurbURL.netloc = siteURL.netloc
         blurbURL.scheme = siteURL.scheme

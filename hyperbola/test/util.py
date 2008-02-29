@@ -1,10 +1,16 @@
+
+from twisted.python.reflect import qual
+
 from epsilon.extime import Time
 
 from axiom.store import Store
-from axiom.dependency import installOn
 from axiom.userbase import LoginSystem
+from axiom.plugins.mantissacmd import Mantissa
 
-from xmantissa import sharing, website
+from xmantissa import sharing
+from xmantissa.port import SSLPort
+from xmantissa.product import Product
+from xmantissa.web import SiteConfiguration
 
 from hyperbola import hyperblurb
 from hyperbola.hyperbola_model import HyperbolaPublicPresence
@@ -19,20 +25,34 @@ class HyperbolaTestMixin:
         Set up a store, install a L{HyperbolaPublicPresence} and its
         dependencies, and create a role
         """
-        store = Store(self.mktemp())
-        installOn(website.WebSite(store=store), store)
+        self.siteStore = Store(filesdir=self.mktemp())
+        Mantissa().installSite(
+            self.siteStore, u"localhost", u"", generateCert=False)
 
-        self.loginSystem = LoginSystem(store=store)
-        installOn(self.loginSystem, store)
+        # Make it standard so there's no port number in the generated URL.
+        # This kind of sucks.  I don't want people assuming SSLPorts are
+        # created by Mantissa().installSite().  Oh right, I should add a better
+        # API for initializing a Mantissa server. -exarkun
+        site = self.siteStore.findUnique(SiteConfiguration)
+        ssls = list(site.store.query(SSLPort))
+        ssls[0].portNumber = 443
+
+        self.loginSystem = self.siteStore.findUnique(LoginSystem)
+
+        product = Product(store=self.siteStore,
+                          types=[qual(HyperbolaPublicPresence)])
 
         acct = self.loginSystem.addAccount(
             u'user', u'localhost', u'asdf', internal=True)
-        self.store = acct.avatars.open()
-        self.publicPresence = HyperbolaPublicPresence(store=self.store)
-        installOn(self.publicPresence, self.store)
+        self.userStore = acct.avatars.open()
+
+        product.installProductOn(self.userStore)
+
+        self.publicPresence = self.userStore.findUnique(
+            HyperbolaPublicPresence)
 
         self.role = sharing.Role(
-            store=self.store,
+            store=self.userStore,
             externalID=u'foo@host', description=u'foo')
 
 
@@ -57,7 +77,7 @@ class HyperbolaTestMixin:
         if body is None:
             body = flavor
         return hyperblurb.Blurb(
-            store=self.store,
+            store=self.userStore,
             title=title,
             body=body,
             flavor=flavor,
@@ -75,6 +95,6 @@ class HyperbolaTestMixin:
         """
         share = sharing.shareItem(blurb)
         return sharing.getShare(
-            self.store,
-            sharing.getEveryoneRole(self.store),
+            self.userStore,
+            sharing.getEveryoneRole(self.userStore),
             share.shareID)

@@ -4,8 +4,6 @@ Tests for Hyperbola view logic
 """
 from xml.dom import minidom
 
-from zope.interface import directlyProvides
-
 from twisted.trial.unittest import TestCase
 
 from epsilon.extime import Time
@@ -14,19 +12,16 @@ from epsilon.scripts import certcreate
 from axiom import userbase
 from axiom.store import Store
 from axiom.dependency import installOn
-from axiom.test.util import getPristineStore
 
 from nevow import context, tags, loaders, athena, flat, inevow
 from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
 from nevow.flat import flatten
 
-from xmantissa import sharing, port, websharing, scrolltable
+from xmantissa import sharing, websharing, scrolltable
 from xmantissa.sharing import SharedProxy
 from xmantissa.publicweb import LoginPage
-from xmantissa.ixmantissa import IStaticShellContent, IWebTranslator
-from xmantissa.website import WebSite
-from xmantissa.offering import installOffering
-from xmantissa.plugins.baseoff import baseOffering
+from xmantissa.ixmantissa import IWebTranslator
+from xmantissa.web import SiteConfiguration
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
 from hyperbola.hyperblurb import FLAVOR
@@ -40,10 +35,10 @@ def createStore(testCase):
     """
     Create a new Store in a temporary directory retrieved from C{testCase}.
     Give it a LoginSystem and create an SSL certificate in its files directory.
- 
+
     @param testCase: The L{unittest.TestCase} by which the returned Store will
     be used.
- 
+
     @rtype: L{Store}
     """
     dbdir = testCase.mktemp()
@@ -69,7 +64,7 @@ class ScrollerTestCase(TestCase, HyperbolaTestMixin):
         self._setUpStore()
 
         blogShare = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
-        EVERYBODY = sharing.getEveryoneRole(self.store)
+        EVERYBODY = sharing.getEveryoneRole(self.userStore)
         sharing.itemFromProxy(blogShare).permitChildren(
             EVERYBODY, FLAVOR.BLOG_POST, ihyperbola.IViewable)
 
@@ -78,11 +73,11 @@ class ScrollerTestCase(TestCase, HyperbolaTestMixin):
         # shouldn't be possible anyway, and in the future getRole should just
         # be looking at its proxy.)
         self.publicBlogShare = sharing.getShare(
-            self.store, EVERYBODY, blogShare.shareID)
-        selfRole = sharing.getSelfRole(self.store)
+            self.userStore, EVERYBODY, blogShare.shareID)
+        selfRole = sharing.getSelfRole(self.userStore)
         blogPostShareID = blogShare.post(u'', u'', selfRole)
         self.blogPostSharedToEveryone = sharing.getShare(
-            self.store, EVERYBODY, blogPostShareID)
+            self.userStore, EVERYBODY, blogPostShareID)
         self.blogPostItem = sharing.itemFromProxy(self.blogPostSharedToEveryone)
 
 
@@ -123,7 +118,7 @@ class ScrollerTestCase(TestCase, HyperbolaTestMixin):
             self.blogPostItem.dateCreated.asPOSIXTimestamp())
         self.assertEqual(
             theRow['__id__'],
-            IWebTranslator(self.store).toWebID(self.blogPostItem))
+            IWebTranslator(self.userStore).toWebID(self.blogPostItem))
         blogPostFragment = theRow['blurbView']
         # the scrolltable fragment is not customized, so we want to
         # ensure that the proxy passed to the IColumns is the facet
@@ -216,11 +211,8 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         """
         Test that L{hyperbola_view.BlogListFragment.blogs} renders a list of blogs.
         """
-        ws = self.store.parent.findUnique(WebSite)
-        ws.hostname = u'blogs.renderer'
-        port.SSLPort(store=self.store.parent,
-                     portNumber=443,
-                     factory=ws)
+        site = self.siteStore.findUnique(SiteConfiguration)
+        site.hostname = u'blogs.renderer'
         blog1 = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
         blog2 = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
         blf = hyperbola_view.BlogListFragment(
@@ -292,7 +284,7 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             self._makeBlurb(hyperblurb.FLAVOR.BLOG))
 
         bpr = hyperbola_view.BlurbPostingResource(
-            self.store, blog, self.role.externalID)
+            self.userStore, blog, self.role.externalID)
 
         bpr.fragment.addComment(u'', u'', ())
 
@@ -416,10 +408,10 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
         post = self._makeBlurb(hyperblurb.FLAVOR.BLOG_POST)
 
         authorShareID = sharing.shareItem(
-            post, toRole=sharing.getSelfRole(self.store),
+            post, toRole=sharing.getSelfRole(self.userStore),
             interfaces=[ihyperbola.IEditable]).shareID
         authorPostShare = sharing.getShare(
-            self.store, sharing.getSelfRole(self.store), authorShareID)
+            self.userStore, sharing.getSelfRole(self.userStore), authorShareID)
 
         authorPostView = hyperbola_view.blurbViewDispatcher(authorPostShare)
         THE_TAG = tags.invisible(foo='bar')
@@ -444,17 +436,13 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
 
 
 
-class BlurbViewerTests(TestCase, HyperbolaTestMixin):
+class BlurbViewerTests(HyperbolaTestMixin, TestCase):
     """
     Tests for L{BlurbViewer}.
     """
     def setUp(self):
-        self.store = getPristineStore(self, createStore)
-        installOffering(self.store, baseOffering, {})
-        self.store.parent = getPristineStore(self, createStore)
-        directlyProvides(self.store.parent, IStaticShellContent)
-        installOffering(self.store.parent, baseOffering, {})
-        
+        self._setUpStore()
+
 
     def test_postWithoutPrivileges(self):
         """
@@ -475,7 +463,7 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
         request = FakeRequest(
             uri='/'.join([''] + currentSegments + postSegments),
             currentSegments=currentSegments, args=arguments)
-        blurb = StubBlurb(self.store, FLAVOR.BLOG)
+        blurb = StubBlurb(self.userStore, FLAVOR.BLOG)
         sharedBlurb = SharedProxy(blurb, (IViewable,), 'abc')
         view = BlurbViewer(sharedBlurb)
         child, segments = view.locateChild(request, postSegments)
@@ -483,7 +471,6 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
         self.assertEqual(child.segments, currentSegments + postSegments[:1])
         self.assertEqual(child.arguments, arguments)
         self.assertEqual(segments, postSegments[1:])
-        self.assertIdentical(child.staticContent, self.store.parent)
 
 
     def test_absoluteURL(self):
@@ -491,13 +478,7 @@ class BlurbViewerTests(TestCase, HyperbolaTestMixin):
         Verify that L{BlurbViewer._absoluteURL} returns something that looks
         correct.
         """
-        self._setUpStore()
-        ws = self.store.parent.findUnique(WebSite)
-        ws.hostname = u'absolute.url'
-        port.SSLPort(store=self.store.parent,
-                     portNumber=443,
-                     factory=ws)
         share = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG_POST))
         frag = BlurbViewer(share)
         self.assertEqual(
-            frag._absoluteURL(), 'https://absolute.url' + str(websharing.linkTo(share)))
+            frag._absoluteURL(), 'https://localhost' + str(websharing.linkTo(share)))
