@@ -464,13 +464,14 @@ class AddBlogPostDialogFragment(AddBlogPostFragment):
     jsClass = u'Hyperbola.AddBlogPostDialog'
     fragmentName = 'add-comment/' + FLAVOR.BLOG_POST + '-dialog'
 
-    def title(self, req, tag):
+    def postTitle(self, req, tag):
         """
         Determine a preset value for the title of the comment, by looking at the
         C{title} argument in the request.
         """
         return req.args['title'][0]
-    page.renderer(title)
+    page.renderer(postTitle)
+
 
     def body(self, req, tag):
         """
@@ -480,7 +481,7 @@ class AddBlogPostDialogFragment(AddBlogPostFragment):
         """
         body = req.args['body'][0]
         url = req.args['url'][0]
-        link = tags.a(href=url)[self.title(req, tag)]
+        link = tags.a(href=url)[self.postTitle(req, tag)]
         return flatten((link, tags.br, body))
     page.renderer(body)
 

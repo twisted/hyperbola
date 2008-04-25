@@ -16,12 +16,14 @@ from axiom.dependency import installOn
 from nevow import context, tags, loaders, athena, flat, inevow
 from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
 from nevow.flat import flatten
+from nevow.page import renderer
 
 from xmantissa import sharing, websharing, scrolltable
 from xmantissa.sharing import SharedProxy
-from xmantissa.publicweb import LoginPage
+from xmantissa.publicweb import PublicAthenaLivePage, LoginPage
 from xmantissa.ixmantissa import IWebTranslator
 from xmantissa.web import SiteConfiguration
+from xmantissa.test.test_people import emptyMantissaSiteStore
 
 from hyperbola import hyperbola_view, hyperblurb, ihyperbola
 from hyperbola.hyperblurb import FLAVOR
@@ -482,3 +484,48 @@ class BlurbViewerTests(HyperbolaTestMixin, TestCase):
         frag = BlurbViewer(share)
         self.assertEqual(
             frag._absoluteURL(), 'https://localhost' + str(websharing.linkTo(share)))
+
+
+
+class AddBlogPostDialogFragmentTests(TestCase):
+    """
+    Tests for L{AddBlogPostDialogFragment}.
+    """
+    def setUp(self):
+        """
+        Create a post enough state to have a view for commenting on it.
+        """
+        self.store = emptyMantissaSiteStore()
+        self.flavor = hyperblurb.FLAVOR.BLOG_POST
+        self.author = sharing.getSelfRole(self.store)
+        self.post = hyperblurb.Blurb(
+            store=self.store, author=self.author, flavor=self.flavor)
+        self.postShare = self.author.shareItem(self.post)
+        self.sharedPost = self.author.getShare(self.postShare.shareID)
+        self.postView = hyperbola_view.BlurbViewer(self.sharedPost)
+        self.fragment = hyperbola_view.AddBlogPostDialogFragment(
+            self.postView)
+
+
+    def test_rendering(self):
+        """
+        L{AddBlogPostDialogFragment} can be rendered as part of a Mantissa
+        public Athena page.
+        """
+        page = PublicAthenaLivePage(self.store, self.fragment, None, None)
+        request = FakeRequest()
+        request.args = {'title': ['foo'],
+                        'body': ['bar'],
+                        'url': ['baz']}
+        return renderLivePage(page, reqFactory=lambda: request)
+
+
+    def test_postTitle(self):
+        """
+        L{AddBlogPostDialogFragment.postTitle} returns the first value of the
+        I{title} request argument.
+        """
+        request = FakeRequest(args={'title': ['foo']})
+        self.assertEqual(
+            renderer.get(self.fragment, 'postTitle')(request, None),
+            'foo')
