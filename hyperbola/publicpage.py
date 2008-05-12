@@ -60,13 +60,6 @@ class PublicIndexPage(PublicPage):
                 forUser)
 
 
-    def child_static(self, ctx):
-        """
-        Serves files from the hyperbola/static directory.
-        """
-        return static.File(sibpath(__file__, 'static'))
-
-
     def customizeFor(self, forUser):
         """
         Implement L{ICustomizable.customizeFor} to return a version of this page
