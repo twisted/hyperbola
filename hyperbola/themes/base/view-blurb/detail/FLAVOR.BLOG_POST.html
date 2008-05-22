@@ -1,6 +1,6 @@
 <div xmlns:nevow="http://nevow.com/ns/nevow/0.1"
   xmlns:athena="http://divmod.org/ns/nevow/0.7"
-  nevow:render="liveFragment"
+  nevow:render="liveElement"
   class="hyperbola-blurb hyperbola-blog-post hyperbola-blog-post-detail">
 
   <div class="hyperbola-blog-title">
@@ -51,11 +51,14 @@
       "<nevow:invisible nevow:render="title" />"
     </div>
     <ol>
-      <nevow:invisible nevow:render="view" />
+      <nevow:invisible nevow:render="view">
+        <div class="hyperbola-no-child-blurbs" nevow:pattern="no-child-blurbs">
+          No <nevow:slot name="child-type-name" />s
+        </div>
+      </nevow:invisible>
     </ol>
     <nevow:invisible nevow:render="addComment" />
-    <div class="hyperbola-no-child-blurbs" nevow:pattern="no-child-blurbs"
-      >No <nevow:slot name="child-type-name" />s</div>
+
   </div>
 
   <nevow:invisible nevow:render="editor" />

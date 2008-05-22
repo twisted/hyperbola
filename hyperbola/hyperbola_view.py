@@ -256,11 +256,12 @@ class BlurbPostingResource(publicresource.PublicAthenaLivePage):
 
 
 
-class BlogListFragment(webtheme.ThemedElement):
+class BlogListFragment(athena.LiveElement):
     """
     Fragment which renders a list of all blogs
     """
-    fragmentName = 'hyperbola-blog-list'
+    docFactory = webtheme.ThemedDocumentFactory(
+        'hyperbola-blog-list', '_resolver')
 
     def __init__(self, page, hyperbola):
         """
@@ -268,6 +269,7 @@ class BlogListFragment(webtheme.ThemedElement):
         """
         self.setFragmentParent(page)
         self.hyperbola = hyperbola
+        self._resolver = ixmantissa.ITemplateNameResolver(self.hyperbola.store)
         super(BlogListFragment, self).__init__()
 
     def _getPostURL(self, blog):
@@ -516,7 +518,7 @@ def addCommentDialogDispatcher(parent):
 
 
 
-class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
+class BlurbViewer(athena.LiveElement, rend.ChildLookupMixin):
     """
     Base/default class for rendering blurbs
     """
@@ -526,9 +528,23 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
     customizedFor = None
 
     def __init__(self, original, *a, **k):
+        self.original = original
         super(BlurbViewer, self).__init__(original, *a, **k)
         self._childTypeName = flavorNames[
             FLAVOR.commentFlavors[original.flavor]]
+
+
+    def _getSelectedTag(self, request):
+        """
+        Figure out which tag the user is filtering by, by looking at the URL
+
+        @rtype: C{None} or C{unicode}
+        """
+        tag = request.args.get('tag', [None])[0]
+        if not tag:
+            return None
+        return tag
+
 
     def customizeFor(self, username):
         """
@@ -551,6 +567,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
             # Otherwise, get the primary role of the current observer.
             return sharing.getPrimaryRole(store, self.customizedFor)
 
+
     def child_post(self, ctx):
         """
         If the user is authorized, return a L{BlurbPostingResource}
@@ -561,14 +578,18 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
                 store, self.original, self.customizedFor)
         return LoginPage.fromRequest(store.parent, inevow.IRequest(ctx))
 
+
     def head(self):
         pass
 
-    def render_title(self, ctx, data):
+
+    def title(self, request, tag):
         """
         @return: title of our blurb
         """
         return self.original.title
+    page.renderer(title)
+
 
     def _htmlifyLineBreaks(self, body):
         """
@@ -577,7 +598,8 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         return [(tags.xml(line), tags.br) for line
                     in body.splitlines()]
 
-    def render_body(self, ctx, data):
+
+    def body(self, request, tag):
         """
         @return: body of our blurb
         """
@@ -586,33 +608,42 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         document = parseString(self.original.body, beExtremelyLenient=True)
         body = document.documentElement.toxml()
         return self._htmlifyLineBreaks(body)
+    page.renderer(body)
 
-    def render_dateCreated(self, ctx, data):
+
+    def dateCreated(self, request, tag):
         """
         @return: creation date of our blurb
         """
         return self.original.dateCreated.asHumanly()
+    page.renderer(dateCreated)
 
-    def render_childCount(self, ctx, data):
+
+    def childCount(self, request, tag):
         """
         @return: child count of our blurb
         """
         # XXX
-        return sum(1 for ign in self.original.view(self.getRole()))
+        return str(sum(1 for ign in self.original.view(self.getRole())))
+    page.renderer(childCount)
 
-    def render_childTypeName(self, ctx, data):
+
+    def childTypeName(self, request, tag):
         """
         @return: the name of the type of our child blurbs
         """
         return self._childTypeName
+    page.renderer(childTypeName)
 
-    def _getChildBlurbs(self, ctx):
+
+    def _getChildBlurbs(self, request):
         """
         Get the child blurbs of this blurb
 
         @rtype: C{list} of L{xmantissa.sharing.SharedProxy}
         """
         return list(self.original.view(self.getRole()))
+
 
     def _getChildBlurbViews(self, blurbs):
         """
@@ -624,11 +655,11 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
             _docFactorify(f)
             yield f
 
-    def render_view(self, ctx, data):
+    def view(self, request, tag):
         """
         Render the child blurbs of this blurb
         """
-        blurbs = self._getChildBlurbs(ctx)
+        blurbs = self._getChildBlurbs(request)
         if 0 < len(blurbs):
             blurbItem = sharing.itemFromProxy(self.original)
             fragment = ShareScrollingElement(
@@ -643,10 +674,12 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
             fragment.setFragmentParent(self)
             return fragment
         else:
-            p = inevow.IQ(self.docFactory).onePattern('no-child-blurbs')
-            return [p.fillSlots('child-type-name', self._childTypeName)]
+            p = inevow.IQ(tag).onePattern('no-child-blurbs')
+            return p.fillSlots('child-type-name', self._childTypeName)
+    page.renderer(view)
 
-    def render_addComment(self, ctx, data):
+
+    def addComment(self, request, tag):
         """
         Render some UI for commenting on this blurb
         """
@@ -656,13 +689,17 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         f.setFragmentParent(self)
         _docFactorify(f)
         return f
+    page.renderer(addComment)
 
-    def render_author(self, ctx, data):
+
+    def author(self, request, tag):
         """
         Render the author of this blurb
         """
         # XXX this returns 'Everyone'
         return self.original.author.externalID
+    page.renderer(author)
+
 
     def _absoluteURL(self):
         """
@@ -677,6 +714,7 @@ class BlurbViewer(athena.LiveFragment, rend.ChildLookupMixin):
         blurbURL.scheme = siteURL.scheme
         return str(blurbURL)
 
+
     def child_rss(self, ctx):
         return rss.Feed(self)
 
@@ -689,35 +727,26 @@ class _BlogPostBlurbViewer(BlurbViewer):
 
     NO_TAGS_MARKER = u'Uncategorized'
 
-    def _getSelectedTag(self, ctx):
-        """
-        Figure out which tag the user is filtering by, by looking at the URL
-
-        @rtype: C{None} or C{unicode}
-        """
-        req = inevow.IRequest(ctx)
-        tag = req.args.get('tag', [None])[0]
-        if not tag:
-            return None
-        return tag
-
-    def render_titleLink(self, ctx, data):
+    def titleLink(self, request, tag):
         """
         @return: title of our blurb
         """
         url = websharing.linkTo(self.original)
-        return ctx.tag.fillSlots(
+        return tag.fillSlots(
             'link', url.child('detail')).fillSlots(
             'title', self.original.title)
+    page.renderer(titleLink)
 
-    def render_tags(self, ctx, data):
+
+    def tags(self, request, tag):
         """
         Render the tags of this blurb
         """
         iq = inevow.IQ(self.docFactory)
         separatorPattern = iq.patternGenerator('tag-separator')
-        tags = list()
-        selectedTag = self._getSelectedTag(ctx)
+        tags = []
+        selectedTag = self._getSelectedTag(request)
+
         for tag in self.original.tags():
             if tag == selectedTag:
                 p = 'selected-tag'
@@ -729,26 +758,34 @@ class _BlogPostBlurbViewer(BlurbViewer):
         if tags:
             return tags[:-1]
         return self.NO_TAGS_MARKER
+    page.renderer(tags)
 
-    def render_editor(self, ctx, data):
+
+    def editor(self, request, tag):
         f = editBlurbDispatcher(self.original)
         f.setFragmentParent(self)
         _docFactorify(f)
         return f
+    page.renderer(editor)
 
-    def render_editLink(self, ctx, data):
+
+    def editLink(self, request, tag):
         if ihyperbola.IEditable.providedBy(self.original):
-            return ctx.tag
+            return tag
         return ''
+    page.renderer(editLink)
 
-    def render_deleteLink(self, ctx, data):
+
+    def deleteLink(self, request, tag):
         """
         Render a delete link or not, depending on whether the user has the
         appropriate permissions
         """
         if ihyperbola.IEditable.providedBy(self.original):
-            return ctx.tag
+            return tag
         return ''
+    page.renderer(deleteLink)
+
 
     def delete(self):
         """
@@ -782,17 +819,20 @@ class BlogPostBlurbViewerDetail(_BlogPostBlurbViewer):
     """
     fragmentName = 'view-blurb/detail/' + FLAVOR.BLOG_POST
 
-    def render_blogTitle(self, ctx, data):
+    def blogTitle(self, request, tag):
         """
         Return the title of the blog our blurb was posted in
         """
         return self.original.parent.title
+    page.renderer(blogTitle)
 
-    def render_blogBody(self, ctx, data):
+
+    def blogBody(self, request, tag):
         """
         Return the body (subtitle) of the blog our blurb was posted in
         """
         return self.original.parent.body
+    page.renderer(blogBody)
 
 
 
@@ -852,6 +892,8 @@ class BlogCommentBlurbViewer(BlurbViewer):
     """
     fragmentName = 'view-blurb/' + FLAVOR.BLOG_COMMENT
 
+
+
 class BlogBlurbViewer(BlurbViewer):
     """
     L{BlurbViewer} subclass for rendering blurbs of type L{FLAVOR.BLOG}
@@ -872,44 +914,32 @@ class BlogBlurbViewer(BlurbViewer):
         return list(store.query(
             Tag, Tag.object == Blurb.storeID).getColumn('name').distinct())
 
-    def _getSelectedTag(self, ctx):
-        """
-        Figure out which tag the user is filtering by, by looking at the URL
-
-        @rtype: C{None} or C{unicode}
-        """
-        req = inevow.IRequest(ctx)
-        tag = req.args.get('tag', [None])[0]
-        if not tag:
-            return None
-        return tag
-
-    def _getChildBlurbs(self, ctx):
+    def _getChildBlurbs(self, request):
         """
         Get the child blurbs of this blurb, filtering by the selected tag
 
         @rtype: C{list} of L{xmantissa.sharing.SharedProxy}
         """
-        tag = self._getSelectedTag(ctx)
+        tag = self._getSelectedTag(request)
         if tag is not None:
             return list(self.original.viewByTag(
                 self.getRole(), tag.decode('utf-8')))
         return list(self.original.view(self.getRole()))
 
 
-    def render_tags(self, ctx, data):
+    def tags(self, request, tag):
         """
         Render all tags
         """
         iq = inevow.IQ(self.docFactory)
-        selTag = self._getSelectedTag(ctx)
+        selTag = self._getSelectedTag(request)
         for tag in self._getAllTags():
             if tag == selTag:
                 pattern = 'selected-tag'
             else:
                  pattern = 'tag'
             yield iq.onePattern(pattern).fillSlots('name', tag)
-
+    page.renderer(tags)
 
 
 BLURB_VIEWS = {FLAVOR.BLOG_POST: BlogPostBlurbViewer,

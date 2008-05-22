@@ -13,7 +13,7 @@ from axiom import userbase
 from axiom.store import Store
 from axiom.dependency import installOn
 
-from nevow import context, tags, loaders, athena, flat, inevow
+from nevow import context, tags, loaders, athena, flat, page, inevow
 from nevow.testutil import FakeRequest, FragmentWrapper, renderLivePage
 from nevow.flat import flatten
 from nevow.page import renderer
@@ -86,13 +86,10 @@ class ScrollerTestCase(TestCase, HyperbolaTestMixin):
     def _getRenderViewScroller(self):
         """
         Get a L{hyperbola_view.ShareScrollingElement} by way of
-        L{hyperbola_view.BlogBlurbViewer.render_view}.
+        L{hyperbola_view.BlogBlurbViewer.view}.
         """
         fragment = hyperbola_view.BlogBlurbViewer(self.publicBlogShare)
-        hyperbola_view._docFactorify(fragment)
-        ctx = context.WebContext(tag=tags.invisible())
-        ctx.remember(FakeRequest(), inevow.IRequest)
-        return fragment.render_view(ctx, None)
+        return fragment.view(FakeRequest(), tags.invisible())
 
 
     def test_scrollViewRenderer(self):
@@ -190,23 +187,16 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
 
     def test_blogView(self):
         """
-        L{hyperbola_view.BlogBlurbViewer.render_view} should render a
-        pattern indicating that there are no blog posts, if it has no
-        children.
+        L{hyperbola_view.BlogBlurbViewer.view} should render a pattern
+        indicating that there are no blog posts, if it has no children.
         """
         blogShare = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG))
         fragment = hyperbola_view.BlogBlurbViewer(blogShare)
-        fragment.docFactory = loaders.stan(
-            tags.div(pattern='no-child-blurbs', foo='bar')[
-            tags.slot(name='child-type-name')])
-        ctx = context.WebContext(tag=tags.invisible)
-        ctx.remember(FakeRequest(), inevow.IRequest)
-        result = fragment.render_view(ctx, None)
-        markup = flat.flatten(result)
-        doc = minidom.parseString(markup)
-        self.assertEqual(doc.firstChild.getAttribute('foo'), 'bar')
+        tag = tags.div(pattern="no-child-blurbs", id="correct")
+        result = fragment.view(FakeRequest(), tag)
+        self.assertEqual(result.attributes['id'], "correct")
         self.assertEqual(
-            doc.firstChild.firstChild.nodeValue, fragment._childTypeName)
+            result.slotData['child-type-name'], fragment._childTypeName)
 
 
     def test_blogsRenderer(self):
@@ -327,25 +317,25 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
 
     def test_bodyRenderer(self):
         """
-        L{BlurbViewer.render_body} should return a well-formed XHTML document
+        L{BlurbViewer.body} should return a well-formed XHTML document
         fragment even if the body of the blurb being rendered is not
         well-formed.
         """
         body = u'<i>hello'
         expectedBody = u'<i>hello</i><br />'
         view = BlurbViewer(self._makeBlurb(hyperblurb.FLAVOR.BLOG, None, body))
-        result = flatten(view.render_body(None, None))
+        result = flatten(view.body(None, None))
         self.assertEqual(result, expectedBody)
 
 
     def test_bodyRendererEmptyBody(self):
         """
-        L{BlurbViewer.render_body} should be able to render Blurbs
+        L{BlurbViewer.body} should be able to render Blurbs
         with empty bodies.
         """
         body = u''
         view = BlurbViewer(self._makeBlurb(hyperblurb.FLAVOR.BLOG, None, body))
-        result = flatten(view.render_body(None, None))
+        result = flatten(view.body(None, None))
         self.assertEqual(result, body)
 
 
@@ -366,16 +356,8 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
 
         (post,) = share.view(self.role)
         postFragment = hyperbola_view.blurbViewDispatcher(post)
-
-        postFragment.docFactory = loaders.stan(tags.directive('body'))
-        def gotHTML(html):
-            doc = minidom.parseString(html)
-            divs = doc.getElementsByTagName('div')
-            self.assertEquals(len(divs), 1)
-            self.assertEquals(divs[0].firstChild.nodeValue, 'body')
-        D = renderLivePage(FragmentWrapper(postFragment))
-        D.addCallback(gotHTML)
-        return D
+        result = postFragment.body(None, None)
+        self.assertEqual(flatten(result), '<div>body</div><br />')
 
 
     def test_blogTags(self):
@@ -416,24 +398,22 @@ class ViewTestCase(TestCase, HyperbolaTestMixin):
             self.userStore, sharing.getSelfRole(self.userStore), authorShareID)
 
         authorPostView = hyperbola_view.blurbViewDispatcher(authorPostShare)
-        THE_TAG = tags.invisible(foo='bar')
-        result = authorPostView.render_editLink(
-            context.WebContext(tag=THE_TAG), None)
-        self.assertIdentical(result, THE_TAG)
+        tag = tags.invisible(foo='bar')
+        result = authorPostView.editLink(None, tag)
+        self.assertIdentical(result, tag)
 
 
     def test_titleLink(self):
         """
-        Verify that L{hyperbola_view.BlogPostBlurbViewer.render_titleLink}
-        links to the correct url.
+        Verify that L{hyperbola_view.BlogPostBlurbViewer.titleLink} links to
+        the correct url.
         """
         share = self._shareAndGetProxy(self._makeBlurb(FLAVOR.BLOG_POST))
-        ctx = context.WebContext(tag=tags.div[tags.slot('link')])
+        tag = tags.div[tags.slot('link')]
         frag = hyperbola_view.BlogPostBlurbViewer(share)
-        markup = flat.flatten(frag.render_titleLink(ctx, None))
-        doc = minidom.parseString(markup)
+        tag = page.renderer.get(frag, 'titleLink')(None, tag)
         self.assertEqual(
-            doc.firstChild.firstChild.nodeValue,
+            str(tag.slotData['link']),
             str(websharing.linkTo(share).child('detail')))
 
 

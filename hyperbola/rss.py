@@ -63,8 +63,9 @@ class Feed(rend.Page):
         yield RSS.lastBuildDate[self.timestamp.asRFC2822()]
 
     def render_items(self, ctx, data):
+        request = inevow.IRequest(ctx)
         for item in self.original._getChildBlurbViews(
-            self.original._getChildBlurbs(ctx)):
+            self.original._getChildBlurbs(request)):
             yield RSS.item[
                 RSS.title[item.original.title],
                 RSS.link[item._absoluteURL()],

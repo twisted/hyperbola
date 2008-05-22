@@ -210,11 +210,12 @@ class RSSTestCase(TestCase):
                             POST_BODY)
         rssView = hyperbola_view.blurbViewDispatcher(blurb).child_rss(None)
         return renderPage(rssView).addCallback(checkData)
+
+
     def test_emptyRSS(self):
         """
         Test that RSS generation works properly for blurbs with no children.
         """
-
         blurb = MockBlurb(flavor=hyperblurb.FLAVOR.BLOG,
                           title=u"blog title", body=u"blog desc",
                           children=[], author=self.BLOG_AUTHOR)
@@ -225,6 +226,8 @@ class RSSTestCase(TestCase):
                                             rssDoc)), 0)
         rssView = hyperbola_view.blurbViewDispatcher(blurb).child_rss(None)
         return renderPage(rssView).addCallback(checkData)
+
+
 
 class MockBlurb(object):
     """
