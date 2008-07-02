@@ -24,8 +24,7 @@ plugin = offering.Offering(
     siteRequirements = [
         (userbase.IRealm, userbase.LoginSystem),
         (None, website.WebSite)],
-
-    appPowerups = [HyperbolaPublicPage],
+    appPowerups = (),
     installablePowerups = [(
         u'Publisher',
         u'Allows publishing of posts in a weblog format.',
