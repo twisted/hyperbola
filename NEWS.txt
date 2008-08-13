@@ -1,3 +1,8 @@
+0.0.2 (2008-08-12):
+  - Rename a renderer from 'title' to 'postTitle', to avoid colliding
+    with a Mantissa attribute.
+  - Updated a number of view classes from Fragments to Elements.
+
 0.0.1 (2007-09-05):
   - Initial Release
 
