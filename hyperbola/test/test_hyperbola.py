@@ -14,6 +14,7 @@ from axiom.userbase import LoginSystem, LoginMethod
 from axiom.plugins.mantissacmd import Mantissa
 
 from xmantissa.product import Product
+from xmantissa.ixmantissa import IWebViewer
 from xmantissa.sharing import Role, getShare, itemFromProxy, shareItem, NoSuchShare
 from xmantissa.sharing import getEveryoneRole, getSelfRole
 from xmantissa.publicresource import PublicAthenaLivePage
@@ -139,7 +140,7 @@ class BlurbTests(unittest.TestCase):
         verify that it will have appropriate properties set.
         """
         er = getEveryoneRole(self.userStore)
-        si = SharingIndex(self.userStore, er.externalID)
+        si = SharingIndex(self.userStore, IWebViewer(self.siteStore))
         child, segs = si.locateChild(None, ['blog'])
         self.assertEquals(len(segs), 0)
         self.failUnless(isinstance(child, PublicAthenaLivePage))
