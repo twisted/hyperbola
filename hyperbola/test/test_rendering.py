@@ -1,8 +1,15 @@
+# Copyright (c) 2008 Divmod.  See LICENSE for details.
+
 """
 Test that the Hyperbola view classes can be rendered
 """
+
 from xml.dom import minidom
-from xml import xpath
+from lxml.etree import XPathEvaluator, fromstring
+
+def evaluateXPath(path, document):
+    return XPathEvaluator(fromstring(document)).evaluate(path)
+
 
 from twisted.trial.unittest import TestCase
 from twisted.internet import defer
@@ -34,6 +41,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
         fragment.docFactory = webtheme.getLoader(fragment.fragmentName)
         return renderLivePage(FragmentWrapper(fragment), *a, **k)
 
+
     def test_adaption(self):
         """
         Test that we can adapt a blurb of any flavor to
@@ -45,6 +53,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
             deferreds.append(self._renderFragment(
                 ixmantissa.INavigableFragment(proxy)))
         return defer.gatherResults(deferreds)
+
 
     def test_blurbViewDispatch(self):
         """
@@ -58,6 +67,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
             deferreds.append(self._renderFragment(
                 hyperbola_view.blurbViewDispatcher(proxy)))
         return defer.gatherResults(deferreds)
+
 
     def test_blurbViewDetailDispatch(self):
         """
@@ -77,6 +87,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
             deferreds.append(self._renderFragment(
                 hyperbola_view.blurbViewDetailDispatcher(childProxy)))
         return defer.gatherResults(deferreds)
+
 
     def test_blogPostDetailRendering(self):
         """
@@ -117,6 +128,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
         D.addCallback(rendered)
         return D
 
+
     def test_addCommentDispatch(self):
         """
         Test that we can pass a blurb of any flavor to
@@ -130,6 +142,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
                 hyperbola_view.addCommentDispatcher(
                     hyperbola_view.blurbViewDispatcher(proxy))))
         return defer.gatherResults(deferreds)
+
 
     def test_addCommentDialogDispatch(self):
         """
@@ -151,6 +164,7 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
                 reqFactory=RequestWithArgs))
         return defer.gatherResults(deferreds)
 
+
     def test_editBlurbDispatch(self):
         """
         Test that we can pass a blurb of any flavor to
@@ -164,20 +178,23 @@ class RenderingTestCase(TestCase, HyperbolaTestMixin):
                 hyperbola_view.editBlurbDispatcher(proxy)))
         return defer.gatherResults(deferreds)
 
+
+
 class RSSTestCase(TestCase):
     """
     Tests for RSS generation.
     """
     BLOG_URL = 'http://example.com/blog'
     BLOG_AUTHOR = u'bob@example.com'
+
     def setUp(self):
-        self._oldAbsoluteURL = hyperbola_view.BlurbViewer._absoluteURL
-        self._oldGetRole = hyperbola_view.BlurbViewer.getRole
-        hyperbola_view.BlurbViewer._absoluteURL = lambda x: self.BLOG_URL
-        hyperbola_view.BlurbViewer.getRole = lambda x: None
-    def tearDown(self):
-        hyperbola_view.BlurbViewer._absoluteURL = self._oldAbsoluteURL
-        hyperbola_view.BlurbViewer.getRole = self._oldGetRole
+        self.patch(
+            hyperbola_view.BlurbViewer, '_absoluteURL',
+            lambda x: self.BLOG_URL)
+        self.patch(
+            hyperbola_view.BlurbViewer, 'getRole', lambda x: None)
+
+
     def test_rssGeneration(self):
         """
         Test that the RSS generator produces the desired output.
@@ -187,24 +204,22 @@ class RSSTestCase(TestCase):
         POST_TITLE = u'awesome title'
         POST_BODY = u'<div>body</div>'
         blurb = MockBlurb(flavor=hyperblurb.FLAVOR.BLOG,
-                         title=BLOG_TITLE, body=BLOG_DESC,
+                          title=BLOG_TITLE, body=BLOG_DESC,
                           author=self.BLOG_AUTHOR,
-                         children=[MockBlurb(flavor=hyperblurb.FLAVOR.BLOG_POST,
-                                             title=POST_TITLE,
-                                             body=POST_BODY,
-                                             author=self.BLOG_AUTHOR,
-                                             children=[])])
+                          children=[MockBlurb(flavor=hyperblurb.FLAVOR.BLOG_POST,
+                                              title=POST_TITLE,
+                                              body=POST_BODY,
+                                              author=self.BLOG_AUTHOR,
+                                              children=[])])
         def checkData(rssData):
-            rssDoc = minidom.parseString(rssData)
             def assertPathEqual(path, data):
-                self.assertEqual(xpath.Evaluate(path, rssDoc)[0].wholeText,
-                                 data)
+                self.assertEqual(evaluateXPath(path, rssData)[0], data)
             assertPathEqual('/rss/channel/title/text()', BLOG_TITLE)
             assertPathEqual('/rss/channel/link/text()', self.BLOG_URL)
             assertPathEqual('/rss/channel/description/text()', BLOG_DESC)
 
-            self.assertEqual(len(xpath.Evaluate('/rss/channel/item', rssDoc)),
-                             1)
+            self.assertEqual(
+                len(evaluateXPath('/rss/channel/item', rssData)), 1)
             assertPathEqual('/rss/channel/item[1]/title/text()', POST_TITLE)
             assertPathEqual('/rss/channel/item[1]/description/text()',
                             POST_BODY)
@@ -222,8 +237,7 @@ class RSSTestCase(TestCase):
 
         def checkData(rssData):
             rssDoc = minidom.parseString(rssData)
-            self.assertEqual(len(xpath.Evaluate('/rss/channel/item',
-                                            rssDoc)), 0)
+            self.assertEqual(evaluateXPath('/rss/channel/item', rssData), [])
         rssView = hyperbola_view.blurbViewDispatcher(blurb).child_rss(None)
         return renderPage(rssView).addCallback(checkData)
 
@@ -245,9 +259,10 @@ class MockBlurb(object):
         class author(object):
             externalID = author
         self.author = author
+
+
     def view(self, role):
         """
         Not testing sharing logic here, so just provide children as-is.
         """
         return self.children
-
