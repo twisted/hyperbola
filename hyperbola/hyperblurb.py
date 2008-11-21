@@ -161,8 +161,7 @@ class Blurb(Item):
         default=0)
 
     author = reference(
-        reftype=Role,
-        allowNone=False)
+        reftype=Role, allowNone=False, whenDeleted=reference.DISALLOW)
 
     parent = reference()        # to Blurb, but you can't spell that AGGUGHH
     flavor = text(doc="One of FLAVOR's capitalized attributes.",
@@ -409,7 +408,7 @@ class PastBlurb(Item):
     body = text()
 
     hits = integer(doc="The number of times that this blurb has been displayed to users.")
-    author = reference(reftype=Role,
-                       allowNone=False)
+    author = reference(
+        reftype=Role, allowNone=False, whenDeleted=reference.DISALLOW)
 
     blurb = reference(reftype=Blurb)

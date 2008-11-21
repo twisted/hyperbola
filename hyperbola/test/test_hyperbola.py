@@ -12,6 +12,8 @@ from epsilon.extime import Time
 
 from axiom.userbase import LoginSystem, LoginMethod
 from axiom.plugins.mantissacmd import Mantissa
+from axiom.attributes import integer, timestamp, text, reference
+from axiom.test.util import assertSchema
 
 from xmantissa.product import Product
 from xmantissa.ixmantissa import IWebViewer
@@ -56,7 +58,47 @@ class BootstrappingTests(unittest.TestCase):
 
 
 
+class CheapBlurbTestCase(unittest.TestCase):
+    """
+    Tests for L{hyperblurb} that do not require extensive setup.
+    """
+
+    def test_blurbSchema(self):
+        """
+        Verify L{hyperblurb.Blurb}'s schema.
+        """
+        assertSchema(self, hyperblurb.Blurb, dict(
+            dateCreated = timestamp(),
+            dateLastEdited = timestamp(),
+            title = text(),
+            body = text(),
+            hits = integer(default=0),
+            author = reference(
+                reftype=Role, allowNone=False, whenDeleted=reference.DISALLOW),
+            parent = reference(),
+            flavor = text(allowNone=False)))
+
+
+    def test_pastBlurbSchema(self):
+        """
+        Verify L{hyperblurb.PastBlurb}'s schema.
+        """
+        assertSchema(self, hyperblurb.PastBlurb, dict(
+            dateEdited = timestamp(),
+            title = text(),
+            body = text(),
+            hits = integer(),
+            author = reference(
+                reftype=Role, allowNone=False, whenDeleted=reference.DISALLOW),
+            blurb = reference(reftype=hyperblurb.Blurb)))
+
+
+
 class BlurbTests(unittest.TestCase):
+    """
+    Tests for L{hyperblurb.Blurb}.
+    """
+
     def setUp(self):
         self.siteStore = Store(filesdir=self.mktemp())
         Mantissa().installSite(self.siteStore, u'example.com', u"", False)
